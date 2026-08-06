@@ -1,10 +1,13 @@
-# Targeted diagnostics, cohort flow, and missingness accounting.
+# Module 04: model diagnostics, cohort flow, missingness, and warnings.
+## 04.1 Verify upstream snapshots and primary-result alignment ----------------
 run_diagnostics <- function(state) {
+  # Diagnostics run against the exact sealed primary and sensitivity outputs.
   evalq({
   stage6_dir <- file.path(out_dir, "qc", "stage6")
   stage6_snapshot_dir <- file.path(stage6_dir, "stage6_snapshot")
   dir.create(stage6_snapshot_dir, recursive = TRUE, showWarnings = FALSE)
 
+  # Collect all diagnostic-release gates in a single table.
   stage6_checks <- list()
   add_stage6_check <- function(check_id, pass, expected, observed, details = "") {
     stage6_checks[[length(stage6_checks) + 1L]] <<- data.table(
@@ -12,6 +15,7 @@ run_diagnostics <- function(state) {
       observed = as.character(observed), details = as.character(details)
     )
   }
+  # Verify each upstream file by both size and SHA-256 hash.
   verify_stage6_prior <- function(manifest_path, snapshot_path) {
     if (!file.exists(manifest_path)) {
       return(list(ok = FALSE, n = 0L, matching = 0L))
@@ -64,6 +68,7 @@ run_diagnostics <- function(state) {
   )
   if (!prior_ok) stop("Stage 6 requires intact Stage 4 and Stage 5 snapshots.")
 
+  # Confirm that the current primary results reproduce the sealed reference sets.
   stage4_results_class <- fread(
     file.path(prior_specs$stage4[[2]], "results_class.csv"),
     colClasses = list(character = "bnf_class_code")
@@ -90,6 +95,8 @@ run_diagnostics <- function(state) {
   )
   if (!primary_alignment) stop("Current primary results do not match Stage 4 authority.")
 
+  ## 04.2 Refit every eligible series and calculate diagnostic metrics ---------
+  # Recreate the mean model using the distribution selected in the primary screen.
   fit_primary_mean <- function(series, screen_row) {
     tryCatch({
       d <- merge(covar, series[, c("year_month", "items")], by = "year_month")
@@ -111,6 +118,7 @@ run_diagnostics <- function(state) {
     })
   }
 
+  # Return one complete diagnostic row, including explicit refit failures.
   diagnose_primary_series <- function(series, screen_row) {
     fitted_object <- fit_primary_mean(series, screen_row)
     if (!fitted_object$ok) {
@@ -177,6 +185,7 @@ run_diagnostics <- function(state) {
     )
   }
 
+  # Apply the same diagnostic calculation to each class or drug series.
   diagnose_level <- function(monthly, screen, id_col, name_col, level_name) {
     rbindlist(lapply(seq_len(nrow(screen)), function(i) {
       screen_row <- screen[i, , drop = FALSE]
@@ -263,10 +272,10 @@ run_diagnostics <- function(state) {
     "checked"
   )
 
-  # Selection is explicit and reproducible. Automated metrics are retained for
-  # all series; detailed month-level residuals and ACFs are limited to the
-  # prespecified scientific and diagnostic review groups below.
+  ## 04.3 Select a focused set for detailed residual review -------------------
+  # Automated metrics cover all series; detailed residuals use prespecified groups.
   selection_parts <- list()
+  # Add existing requested codes to the detailed-review selection.
   add_selection <- function(inventory, codes, reason) {
     rows <- inventory[series_code %in% as.character(codes),
                       .(level, series_code, series_name)]
@@ -275,6 +284,7 @@ run_diagnostics <- function(state) {
       selection_parts[[length(selection_parts) + 1L]] <<- rows
     }
   }
+  # Select the largest finite values of one diagnostic metric.
   top_metric_codes <- function(inventory, metric, n = 5L) {
     values <- inventory[is.finite(get(metric))][order(-get(metric))]
     head(values$series_code, n)
@@ -407,6 +417,7 @@ run_diagnostics <- function(state) {
   )
   setorder(diagnostic_selection, level, series_code)
 
+  ## 04.4 Extract month-level residuals and autocorrelation --------------------
   extract_targeted_details <- function(selection) {
     time_parts <- list()
     acf_parts <- list()
@@ -518,6 +529,7 @@ run_diagnostics <- function(state) {
       extreme_harmonic_amplitude | diagnostic_refit_failed]
   setorder(diagnostic_review_flags, -any_exception, level, series_code)
 
+  ## 04.5 Reconcile the sequential cohort flow -------------------------------
   make_cohort_flow <- function(eligibility, screen, results, id_col, level_name) {
     tab <- as.data.table(copy(eligibility))
     tab[, series_code := as.character(get(id_col))]
@@ -531,6 +543,7 @@ run_diagnostics <- function(state) {
     } else {
       as.character(screen[[id_col]][screen$drug_significant])
     }
+    # Construct one ordered cohort-flow row from a unique set of codes.
     row_for <- function(step_order, step, rule_type, codes, notes) {
       codes <- unique(as.character(codes))
       included_items <- sum(tab$total_items[tab$series_code %in% codes])
@@ -586,6 +599,7 @@ run_diagnostics <- function(state) {
                      "bnf_drug_code", "drug")
   ), use.names = TRUE)
 
+  # Count overlaps between the two eligibility rules without double-counting.
   make_exclusion_overlap <- function(eligibility, level_name) {
     as.data.table(copy(eligibility))[, .(
       n_series = .N,
@@ -662,6 +676,7 @@ run_diagnostics <- function(state) {
   )
 
   list_size_main <- list_size_source_qc[analytical_role == "main_2022_2025"]
+  ## 04.6 Account for missing, invalid, and unmatched analytical values --------
   invalid_epd_items <- epd_main[, sum(
     missing_items_rows + nonnumeric_items_rows + negative_items_rows +
       noninteger_items_rows
@@ -814,6 +829,7 @@ run_diagnostics <- function(state) {
     paste(warning_summary$category, warning_summary$n, sep = "=", collapse = "; ")
   )
 
+  ## 04.7 Write diagnostics and seal the stage after all gates pass ------------
   output_files <- c(
     "model_diagnostic_inventory.csv", "diagnostic_selection.csv",
     "targeted_residual_timeseries.csv", "targeted_residual_acf.csv",

@@ -1,9 +1,10 @@
-# Primary eligibility, modelling, characterisation, and tabular outputs.
+# Module 02: eligibility, modelling, characterisation, and primary outputs.
 run_primary_analysis <- function(state) {
+  # Work in the coordinator context so sensitivity and reporting modules can reuse results.
   evalq({
-### 6. Eligibility and coverage
+## 02.1 Apply eligibility rules and account for exclusions --------------------
 
-# Eligible if prescribed in every month AND at least 1000 items dispensed nationally each calendar year
+# Eligible series appear in all 48 months and reach 1,000 national items per year.
 if (!exists("data_dir")) stop("data_dir not set - run the setup/import section first.")
 if (!exists("expected_ym")) stop("expected_ym was not created by canonical setup.")
 if (!exists("class_monthly")) class_monthly <- readRDS(file.path(data_dir, "class_monthly.rds"))
@@ -13,7 +14,7 @@ n_months_req <- length(expected_ym)                    # 48
 n_years_req  <- n_distinct(expected_ym %/% 100L)       # 4
 min_items_yr <- eligibility_min_items_year
 
-## Eligibility flags per drug class
+### Class eligibility
 
 elig_class <- class_monthly |>
   group_by(bnf_class_code, bnf_class_name) |>
@@ -30,7 +31,7 @@ elig_class <- class_monthly |>
          eligible         = rule_every_month & rule_min_volume)
 
 
-# Eligibility flags per drug )note that drug names for the same code may have changed, so aggregate by code, and use more recent name)
+# Drug eligibility is keyed by code; the latest observed labels supply metadata.
 
 drug_meta <- drug_monthly |>
   group_by(bnf_drug_code) |>
@@ -56,14 +57,15 @@ elig_drug <- drug_meta |>
          rule_min_volume  = n_years == n_years_req & min_year_items >= min_items_yr,
          eligible         = rule_every_month & rule_min_volume)
 
-## one row per series (guards against grouping anomalies)
+# Confirm that eligibility tables contain exactly one row per series.
 stopifnot(
   nrow(elig_class) == n_distinct(class_monthly$bnf_class_code),
   nrow(elig_drug)  == n_distinct(drug_monthly$bnf_drug_code)
 )
 
-## List exclusions and summarise coverage
+### Exclusions and volume coverage
 
+# Summarise retained series and the prescribing volume excluded.
 coverage_one <- function(tab, level_name) {
   eligible_flag <- tab$eligible %in% TRUE
   tibble(
@@ -79,6 +81,7 @@ coverage <- bind_rows(
   coverage_one(elig_drug, "drug")
 )
 
+# Assign one readable reason to every excluded series.
 add_reason <- function(tab) {
   tab |>
     filter(!eligible) |>
@@ -91,7 +94,7 @@ add_reason <- function(tab) {
 excl_class <- add_reason(elig_class)
 excl_drug  <- add_reason(elig_drug)
 
-# Summarise reasons for exclusion
+# Report mutually exclusive exclusion reasons at each analysis level.
 reason_breakdown <- function(excl, elig, level_name) {
   lvls <- c("<1000 items/year", "not every month", "not every month; <1000 items/year")
   n_total <- nrow(elig)
@@ -115,7 +118,7 @@ reason_breakdown <- function(excl, elig, level_name) {
 excl_drug_summary  <- reason_breakdown(excl_drug,  elig_drug,  "drugs")
 excl_class_summary <- reason_breakdown(excl_class, elig_class, "classes")
 
-## Filter data for analysis sets
+### Eligible monthly panels
 
 class_monthly_elig <- class_monthly |>
   semi_join(filter(elig_class, eligible), by = "bnf_class_code")
@@ -123,7 +126,7 @@ class_monthly_elig <- class_monthly |>
 drug_monthly_elig <- drug_monthly |>
   semi_join(filter(elig_drug, eligible), by = "bnf_drug_code")
 
-## Save and report
+### Eligibility outputs
 
 saveRDS(elig_class,         file.path(data_dir, "eligibility_class.rds"))
 saveRDS(elig_drug,          file.path(data_dir, "eligibility_drug.rds"))
@@ -145,7 +148,7 @@ cat(sprintf(paste0(
   cc$eligible, cc$total_series, 100 * cc$excluded_item_share,
   cd$eligible, cd$total_series, 100 * cd$excluded_item_share))
 
-## Check high-volume exclusions in case an exclusion is due to a BNF code change
+# Surface high-volume exclusions for manual review of possible coding drift.
 if (nrow(excl_drug)) {
   cat("  Largest excluded drugs:\n")
   print(excl_drug |> slice_head(n = 20) |>
@@ -157,21 +160,22 @@ if (nrow(excl_class)) {
           select(bnf_class_code, bnf_class_name, total_items, reason))
 }
 
-### 7. Model fitting Poisson GLM (fixed spline + Fourier + patient-days offset) -------
-# Returns a one-row data frame - seasonality p value, distribution, route, diagnostics, harmonic coefficients, convergence flags
+## 02.2 Define the diagnostic-routed seasonal model ---------------------------
+# Each fit returns its seasonal test, chosen route, diagnostics, coefficients,
+# convergence status, and any failure note in one row.
 
-# Packages
+# Fail early if a model-specific package is unavailable.
 .needed <- c("MASS", "AER", "sandwich", "lmtest", "car")
 .missing <- .needed[!vapply(.needed, requireNamespace, logical(1), quietly = TRUE)]
 if (length(.missing))
   stop("install required package(s): ", paste(.missing, collapse = ", "))
 
-# formulas reference columns in the per-series modelling frame (offset included in-formula so Poisson and negative binomial treated identically)
+# Full and reduced formulas share the fixed spline and patient-days offset.
 .f_full <- items ~ trend1 + trend2 + trend3 + sin12 + cos12 + sin6 + cos6 + offset(off)
 .f_red  <- items ~ trend1 + trend2 + trend3 + offset(off)
 .harmonics <- c("sin12", "cos12", "sin6", "cos6")
 
-# HAC route: joint Wald on the four harmonics under Newey-West covariance
+# The HAC route jointly tests all four harmonics with Newey–West covariance.
 .do_hac <- function(fp, bw_cap = 12) {
   bw     <- tryCatch(sandwich::bwNeweyWest(fp, prewhite = 1L), error = function(e) NA_real_)
   bw_use <- if (is.na(bw)) bw_cap else min(bw, bw_cap)
@@ -182,7 +186,7 @@ if (length(.missing))
   list(p = wt[["Pr(>Chisq)"]][2], bw = bw_use, capped = capped)
 }
 
-# NB fit to treat non-convergence as failure, and will fall back to HAC
+# A failed negative-binomial fit is explicit and falls back to the HAC route.
 .nb_fit <- function(form, d) {
   bad <- FALSE
   f <- withCallingHandlers(
@@ -196,8 +200,7 @@ if (length(.missing))
   f
 }
 
-# fit series function
-
+# Select Poisson, negative-binomial, or HAC inference from prespecified diagnostics.
 fit_test_series <- function(series, covar,
                             alpha_disp = diagnostic_alpha,
                             alpha_lb = diagnostic_alpha,
@@ -268,7 +271,7 @@ fit_test_series <- function(series, covar,
 }
 
 
-### 8. Run fit over every eligible drug class, applying BH at 5% FDR, reports route/distrbution properties ---------
+## 02.3 Fit and screen the primary class family -------------------------------
 
 stopifnot(exists("fit_test_series"), exists("covar"), exists("class_monthly_elig"))
 
@@ -278,23 +281,15 @@ screen_class <- class_monthly_elig |>
   group_modify(~ fit_test_series(.x, covar)) |>
   ungroup()
 
-# BH across the class family; a class is significant at FDR 5%
-stage3_legacy_inference <- FALSE
-if (stage3_legacy_inference) {
-  screen_class <- screen_class |>
-    mutate(p_adj = p.adjust(p_value, method = "BH"),
-           significant = !is.na(p_adj) & p_adj < fdr_alpha) |>
-    arrange(p_adj)
-} else {
-  screen_class <- screen_class |>
-    mutate(class_q_bh = p.adjust(p_value, method = "BH"),
-           class_significant = !is.na(class_q_bh) & class_q_bh < fdr_alpha,
-           inference_scope = "primary_inferential",
-           multiplicity_family = "all_eligible_classes") |>
-    arrange(class_q_bh)
-}
+# Apply BH correction once across the complete eligible-class family.
+screen_class <- screen_class |>
+  mutate(class_q_bh = p.adjust(p_value, method = "BH"),
+         class_significant = !is.na(class_q_bh) & class_q_bh < fdr_alpha,
+         inference_scope = "primary_inferential",
+         multiplicity_family = "all_eligible_classes") |>
+  arrange(class_q_bh)
 
-# proportions the methods commit to reporting
+# Summarise the distribution and inference route used across classes.
 route_summary_class <- screen_class |>
   count(distribution, route, name = "n") |>
   mutate(pct = round(100 * n / sum(n), 1))
@@ -307,87 +302,56 @@ fwrite(route_summary_class,  file.path(data_dir, "screen_class_route_summary.csv
 
 cat(sprintf("Class screen: %d classes | %d significant (BH 5%%) | %d non-converged\n",
             nrow(screen_class),
-            if (stage3_legacy_inference) sum(screen_class$significant)
-            else sum(screen_class$class_significant),
+            sum(screen_class$class_significant),
             n_fail_class))
 print(route_summary_class)
 
-# Interpretation
-# Current outputs use class_q_bh/class_significant. The unqualified historical
-# p_adj/significant names exist only in the Stage 3 reproduction branch.
-# distribution = the distribution used for the modelling fit
-# route = the inferential path the diagnostics selected: NB-LRT (overdispersion, no autocorrelation), HAC-Wald (residual autocorrelation), Poisson-LRT (neither overdispersion or autocorrelation)
-# disp_ratio - dispersion diagnostic; disp_p - p value <0.05 if overdispersion
-# lb_p - Ljung-Box p value for autocorrelation - p < 0.05 significant autocirrelation
-# nw-lag - Newey-West bandwidth chosen
-# theta - NB dispersion parameter
-# sin/cos - harmonic coefficients - will convert to peak months later
+# `route` records the diagnostic-selected test: NB-LRT, HAC-Wald, or Poisson-LRT.
+# The remaining columns retain dispersion, autocorrelation, bandwidth,
+# convergence, and harmonic-coefficient diagnostics for review.
 
-### 9. Run fit over every eligible drug, applying BH at 5% FDR, reports route/distribution properties
-# Current inference applies BH once across all eligible drugs. Parent-class
-# significance is attached afterward as descriptive context only.
+## 02.4 Fit and screen the secondary drug family ------------------------------
+# BH correction covers all eligible drugs; parent-class significance is context only.
 
 stopifnot(exists("fit_test_series"), exists("covar"),
           exists("drug_monthly_elig"), exists("screen_class"))
 
-# fit every eligible drug
+# Fit every eligible drug with the same diagnostic-routing function.
 screen_drug <- drug_monthly_elig |>
   select(bnf_class_code, bnf_drug_code, bnf_drug_name, year_month, items) |>
   group_by(bnf_class_code, bnf_drug_code, bnf_drug_name) |>
   group_modify(~ fit_test_series(.x, covar)) |>
   ungroup()
 
-if (stage3_legacy_inference) {
-  sig_classes <- screen_class |> filter(significant) |> pull(bnf_class_code)
-  screen_drug <- screen_drug |>
-    mutate(parent_class_sig = bnf_class_code %in% sig_classes)
+# Apply BH correction across every eligible drug; parent-class significance is
+# descriptive context and never controls which drugs enter this family.
+screen_drug <- screen_drug |>
+  mutate(drug_all_q_bh = p.adjust(p_value, method = "BH"),
+         drug_significant = !is.na(drug_all_q_bh) & drug_all_q_bh < fdr_alpha,
+         inference_scope = "secondary_exploratory",
+         multiplicity_family = "all_eligible_drugs") |>
+  left_join(
+    screen_class |>
+      select(bnf_class_code, bnf_class_name, class_q_bh, class_significant),
+    by = "bnf_class_code"
+  ) |>
+  mutate(parent_class_significant = class_significant)
 
-  # Historical selected-parent family, retained only for Stage 3 reproduction.
-  sig_family <- screen_drug |>
-    filter(parent_class_sig) |>
-    mutate(p_adj = p.adjust(p_value, "BH")) |>
-    select(bnf_drug_code, p_adj)
-
-  screen_drug <- screen_drug |>
-    left_join(sig_family, by = "bnf_drug_code") |>
-    mutate(significant = parent_class_sig & !is.na(p_adj) & p_adj < fdr_alpha,
-           p_adj_all   = p.adjust(p_value, "BH"),
-           sig_all     = !is.na(p_adj_all) & p_adj_all < fdr_alpha) |>
-    left_join(screen_class |> select(bnf_class_code, bnf_class_name, class_p_adj = p_adj),
-              by = "bnf_class_code") |>
-    arrange(!parent_class_sig, p_adj, p_adj_all)
-} else {
-  # Stage 4 authority: one BH family across every eligible drug. Parent-class
-  # status is attached only after both complete testing families are defined.
-  screen_drug <- screen_drug |>
-    mutate(drug_all_q_bh = p.adjust(p_value, method = "BH"),
-           drug_significant = !is.na(drug_all_q_bh) & drug_all_q_bh < fdr_alpha,
-           inference_scope = "secondary_exploratory",
-           multiplicity_family = "all_eligible_drugs") |>
-    left_join(
-      screen_class |>
-        select(bnf_class_code, bnf_class_name, class_q_bh, class_significant),
-      by = "bnf_class_code"
-    ) |>
-    mutate(parent_class_significant = class_significant)
-
-  # Retained only as an explicitly named legacy audit field. It is not used for
-  # characterisation, tables, figures, narrative counts or main conclusions.
-  conditional_legacy <- screen_drug |>
-    filter(parent_class_significant) |>
-    transmute(
-      bnf_drug_code,
-      conditional_drug_q_legacy = p.adjust(p_value, method = "BH")
-    )
-  screen_drug <- screen_drug |>
-    left_join(conditional_legacy, by = "bnf_drug_code") |>
-    mutate(
-      conditional_drug_significant_legacy = parent_class_significant &
-        !is.na(conditional_drug_q_legacy) &
-        conditional_drug_q_legacy < fdr_alpha
-    ) |>
-    arrange(drug_all_q_bh, bnf_drug_code)
-}
+# Preserve the selected-parent calculation as a named audit field only.
+conditional_legacy <- screen_drug |>
+  filter(parent_class_significant) |>
+  transmute(
+    bnf_drug_code,
+    conditional_drug_q_legacy = p.adjust(p_value, method = "BH")
+  )
+screen_drug <- screen_drug |>
+  left_join(conditional_legacy, by = "bnf_drug_code") |>
+  mutate(
+    conditional_drug_significant_legacy = parent_class_significant &
+      !is.na(conditional_drug_q_legacy) &
+      conditional_drug_q_legacy < fdr_alpha
+  ) |>
+  arrange(drug_all_q_bh, bnf_drug_code)
 
 route_summary_drug <- screen_drug |>
   count(distribution, route, name = "n") |>
@@ -401,24 +365,15 @@ fwrite(route_summary_drug, file.path(data_dir, "screen_drug_route_summary.csv"))
 
 cat(sprintf(paste0(
   "Drug analysis: %d eligible drugs fitted | %d non-converged\n",
-  if (stage3_legacy_inference)
-    "  PRIMARY (in significant classes): %d of %d significant (pooled BH 5%%)\n"
-  else
-    "  LEGACY AUDIT (selected parent classes): %d of %d significant\n",
+  "  AUDIT (selected parent classes): %d of %d significant\n",
   "  SECONDARY EXPLORATORY (all drugs): %d of %d significant (BH 5%%)\n",
   "    of which in NON-significant classes: %d\n"),
   nrow(screen_drug), n_fail_drug,
-  if (stage3_legacy_inference) sum(screen_drug$significant)
-  else sum(screen_drug$conditional_drug_significant_legacy),
-  if (stage3_legacy_inference) sum(screen_drug$parent_class_sig)
-  else sum(screen_drug$parent_class_significant),
-  if (stage3_legacy_inference) sum(screen_drug$sig_all)
-  else sum(screen_drug$drug_significant),
+  sum(screen_drug$conditional_drug_significant_legacy),
+  sum(screen_drug$parent_class_significant),
+  sum(screen_drug$drug_significant),
   nrow(screen_drug),
-  if (stage3_legacy_inference)
-    sum(screen_drug$sig_all & !screen_drug$parent_class_sig)
-  else
-    sum(screen_drug$drug_significant & !screen_drug$parent_class_significant)))
+  sum(screen_drug$drug_significant & !screen_drug$parent_class_significant)))
 print(route_summary_drug)
 
 # Model-level failures remain visible in the screening tables and are also
@@ -433,9 +388,8 @@ model_failures <- bind_rows(
 )
 fwrite(model_failures, file.path(data_dir, "model_failures.csv"))
 
-### 10. Characterise significant seasonality ------
-# peak:trough ratio (with 95% CI), calendar months of max and min,
-# modality (one or two cycles of seasonality)
+## 02.5 Characterise detected seasonality ------------------------------------
+# Derive peak-to-trough amplitude and CI, peak/trough months, and curve modality.
 stopifnot(exists(".nb_fit"), exists(".f_full"), exists("covar"),
           exists("screen_class"), exists("screen_drug"),
           exists("class_monthly_elig"), exists("drug_monthly_elig"))
@@ -452,30 +406,26 @@ stopifnot(exists(".nb_fit"), exists(".f_full"), exists("covar"),
   cos(2 * pi * (1:12) / harmonic_period_months[2])
 )
 
-# seasonal curve over calendar months 1 to 12 from the four coefficients
-# (t = 1 is January, so month m maps directly onto the harmonic arguments)
+# Reconstruct the 12-month seasonal curve from four harmonic coefficients.
 .seasonal_curve <- function(b_sin12, b_cos12, b_sin6, b_cos6, m = 1:12) {
   b_sin12 * sin(2 * pi * m / harmonic_period_months[1]) +
     b_cos12 * cos(2 * pi * m / harmonic_period_months[1]) +
     b_sin6 * sin(2 * pi * m / harmonic_period_months[2]) +
     b_cos6 * cos(2 * pi * m / harmonic_period_months[2])
 }
-# count local maxima of the 12-month curve, treating it as circular
+# Count local maxima while treating December and January as adjacent.
 .n_peaks <- function(s) {
   sum(s > c(s[12], s[-12]) & s > c(s[-1], s[1]))
 }
 
-# capped Newey-West HAC covariance (same bandwidth rule as the fit-test engine)
+# Recreate the capped Newey–West covariance used by the screening model.
 .hac_vcov <- function(fp, bw_cap = 12) {
   bw     <- tryCatch(sandwich::bwNeweyWest(fp, prewhite = 1L), error = function(e) NA_real_)
   bw_use <- if (is.na(bw)) bw_cap else min(bw, bw_cap)
   suppressWarnings(sandwich::NeweyWest(fp, lag = bw_use, prewhite = 1L, adjust = TRUE))
 }
 
-# 95% CI for the peak-to-trough ratio by parametric bootstrap of the four
-# harmonic coefficients, drawn from the route-appropriate covariance (HAC for
-# autocorrelated series, model-based otherwise). Non-smoothness of max/min and
-# peak-month instability are handled naturally by recomputing the ratio per draw.
+# Bootstrap the peak-to-trough ratio from the route-appropriate covariance.
 .ptr_ci <- function(f_full, route,
                     seed = coefficient_draw_seed,
                     B = coefficient_draw_count) {
@@ -496,12 +446,7 @@ stopifnot(exists(".nb_fit"), exists(".f_full"), exists("covar"),
   }, error = function(e) c(NA_real_, NA_real_))
 }
 
-# seasonal reproducibility: does the within-year pattern repeat across years?
-# Detrend (trend-only fit), then average the pairwise correlation between each
-# year's 12-month profile. Genuine seasonality -> high (~0.8-1.0); a structural
-# break or one-off level shift -> low (~0), because the pattern does not recur.
-# Scale-invariant, so smooth growth/decline in a truly seasonal series is not
-# penalised.
+# Average cross-year correlations after removing the shared spline trend.
 .seasonal_reproducibility <- function(series, covar) {
   tryCatch({
     d <- merge(covar, series[, c("year_month", "items")], by = "year_month")
@@ -517,13 +462,7 @@ stopifnot(exists(".nb_fit"), exists(".f_full"), exists("covar"),
   }, error = function(e) NA_real_)
 }
 
-# STL seasonal & trend strength (Wang, Smith & Hyndman): decompose the log-rate
-# with a FLEXIBLE loess trend, then measure the variance share of each component.
-# Because the trend is locally adaptive, a steep or accelerating trend is removed
-# properly, so a trend-dominated series with no real cycle scores low on seasonal
-# strength even though the rigid-spline reproducibility metric can be fooled by
-# leftover trend curvature. Seasonal strength stays high only when a genuine
-# recurring within-year cycle remains after flexible detrending.
+# Measure seasonal and trend strength after STL decomposition of the log rate.
 .stl_strength <- function(series, covar,
                           offset_col = "offset_log_patient_days") {
   tryCatch({
@@ -539,6 +478,7 @@ stopifnot(exists(".nb_fit"), exists(".f_full"), exists("covar"),
   }, error = function(e) c(seasonal = NA_real_, trend = NA_real_))
 }
 
+# Derive all reported seasonal characteristics for one detected series.
 characterise_one <- function(scr_row, series, covar) {
   s   <- .seasonal_curve(scr_row$b_sin12, scr_row$b_cos12,
                          scr_row$b_sin6,  scr_row$b_cos6)
@@ -580,6 +520,7 @@ characterise_one <- function(scr_row, series, covar) {
   out
 }
 
+# Apply characterisation to the discoveries at one analysis level.
 characterise_level <- function(scr, monthly, id_cols, keep_flag) {
   sig <- scr |> filter({{keep_flag}})
   if (nrow(sig) == 0) return(tibble())
@@ -594,17 +535,11 @@ characterise_level <- function(scr, monthly, id_cols, keep_flag) {
     arrange(desc(peak_trough_ratio))
 }
 
-if (stage3_legacy_inference) {
-  char_class <- characterise_level(screen_class, class_monthly_elig,
-                                   c("bnf_class_code"), significant)
-  char_drug  <- characterise_level(screen_drug, drug_monthly_elig,
-                                   c("bnf_drug_code"), significant | sig_all)
-} else {
-  char_class <- characterise_level(screen_class, class_monthly_elig,
-                                   c("bnf_class_code"), class_significant)
-  char_drug  <- characterise_level(screen_drug, drug_monthly_elig,
-                                   c("bnf_drug_code"), drug_significant)
-}
+# Characterise only discoveries from the two complete BH families.
+char_class <- characterise_level(screen_class, class_monthly_elig,
+                                 c("bnf_class_code"), class_significant)
+char_drug  <- characterise_level(screen_drug, drug_monthly_elig,
+                                 c("bnf_drug_code"), drug_significant)
 
 saveRDS(char_class, file.path(data_dir, "characterisation_class.rds"))
 saveRDS(char_drug,  file.path(data_dir, "characterisation_drug.rds"))
@@ -621,106 +556,59 @@ cat(sprintf(paste0(
 cat("\nTop 10 classes by amplitude (peak:trough ratio with 95% CI):\n")
 print(char_class |> slice_head(n = 10) |>
         mutate(ptr = sprintf("%.2f (%.2f-%.2f)", peak_trough_ratio, ptr_lci, ptr_uci)) |>
-        select(bnf_class_name, ptr, peak_month, modality,
-               all_of(if (stage3_legacy_inference) "p_adj" else "class_q_bh")))
+        select(bnf_class_name, ptr, peak_month, modality, class_q_bh))
 
 
-### 11. Reporting --------
+## 02.6 Define meaningful seasonality and save analysis results ---------------
 
 suppressMessages(library(ggplot2))
 stopifnot(exists("char_class"), exists("char_drug"), exists(".seasonal_curve"),
           exists(".f_full"), exists(".nb_fit"), exists("covar"),
           exists("class_monthly_elig"))
 
-# "Meaningful" seasonality requires BOTH: an appreciable, precisely-estimated
-# amplitude (lower 95% CI of the peak:trough ratio at/above the threshold) AND a
-# genuine recurring within-year cycle that survives flexible detrending (STL
-# seasonal strength). STL uses a locally-adaptive trend, so it excludes BOTH
-# structural breaks and trend-dominated series (e.g. a steeply rising drug whose
-# apparent seasonality is trend leakage) - the two failure modes the harmonic
-# model can misread. seasonal_reproducibility is retained as a reported
-# diagnostic (it agrees on breaks but can be fooled by trend curvature).
-# NOTE: calibrated to real data - appreciable-amplitude classes split cleanly
-# into an excluded floor (breaks/trend-dominated, seasonal strength <= 0.36) and
-# a genuine group (>= 0.66), with an empty band between. 0.50 sits mid-gap, so
-# the cut is robust anywhere in 0.40-0.60. stl_trend_strength is NOT a cutoff
-# (it is high for genuine strongly-trending seasonal classes too) but is kept as
-# a descriptive column for characterising trend-dominated series in the text.
+# Meaningful seasonality requires an amplitude lower CI of at least 1.10 and
+# STL seasonal strength of at least 0.50. Other strength metrics are descriptive.
 meaningful_threshold <- amplitude_lci_threshold
 
 fig_dir <- file.path(data_dir, "figures")
 dir.create(fig_dir, showWarnings = FALSE)
 
-## Results table - classes -----------------------------------------------
+## Class results retain inferential scope and rounded reporting measures.
+results_class <- char_class |>
+  transmute(bnf_class_code, bnf_class_name,
+            inference_scope = "primary_inferential",
+            multiplicity_family = "all_eligible_classes",
+            peak_trough_ratio = round(peak_trough_ratio, 3),
+            ptr_lci = round(ptr_lci, 3), ptr_uci = round(ptr_uci, 3),
+            peak_month, trough_month, modality, n_peaks,
+            seasonal_reproducibility = round(seasonal_reproducibility, 3),
+            stl_seasonal_strength = round(stl_seasonal_strength, 3),
+            stl_trend_strength    = round(stl_trend_strength, 3),
+            distribution, route, hac_capped, class_q_bh, class_significant,
+            meaningful = ptr_lci >= meaningful_threshold &
+              stl_seasonal_strength >= stl_strength_threshold) |>
+  arrange(desc(meaningful), desc(peak_trough_ratio))
 
-if (stage3_legacy_inference) {
-  results_class <- char_class |>
-    transmute(bnf_class_code, bnf_class_name,
-              peak_trough_ratio = round(peak_trough_ratio, 3),
-              ptr_lci = round(ptr_lci, 3), ptr_uci = round(ptr_uci, 3),
-              peak_month, trough_month, modality, n_peaks,
-              seasonal_reproducibility = round(seasonal_reproducibility, 3),
-              stl_seasonal_strength = round(stl_seasonal_strength, 3),
-              stl_trend_strength    = round(stl_trend_strength, 3),
-              distribution, route, hac_capped, p_adj,
-              meaningful = ptr_lci >= meaningful_threshold &
-                stl_seasonal_strength >= stl_strength_threshold) |>
-    arrange(desc(meaningful), desc(peak_trough_ratio))
-} else {
-  results_class <- char_class |>
-    transmute(bnf_class_code, bnf_class_name,
-              inference_scope = "primary_inferential",
-              multiplicity_family = "all_eligible_classes",
-              peak_trough_ratio = round(peak_trough_ratio, 3),
-              ptr_lci = round(ptr_lci, 3), ptr_uci = round(ptr_uci, 3),
-              peak_month, trough_month, modality, n_peaks,
-              seasonal_reproducibility = round(seasonal_reproducibility, 3),
-              stl_seasonal_strength = round(stl_seasonal_strength, 3),
-              stl_trend_strength    = round(stl_trend_strength, 3),
-              distribution, route, hac_capped, class_q_bh, class_significant,
-              meaningful = ptr_lci >= meaningful_threshold &
-                stl_seasonal_strength >= stl_strength_threshold) |>
-    arrange(desc(meaningful), desc(peak_trough_ratio))
-}
+## Drug results are explicitly labelled as secondary and exploratory.
+results_drug <- char_drug |>
+  transmute(bnf_drug_code, bnf_drug_name, bnf_class_name,
+            inference_scope = "secondary_exploratory",
+            multiplicity_family = "all_eligible_drugs",
+            peak_trough_ratio = round(peak_trough_ratio, 3),
+            ptr_lci = round(ptr_lci, 3), ptr_uci = round(ptr_uci, 3),
+            peak_month, trough_month, modality,
+            seasonal_reproducibility = round(seasonal_reproducibility, 3),
+            stl_seasonal_strength = round(stl_seasonal_strength, 3),
+            stl_trend_strength    = round(stl_trend_strength, 3),
+            distribution, route, drug_all_q_bh, drug_significant,
+            parent_class_significant, class_q_bh,
+            conditional_drug_q_legacy,
+            conditional_drug_significant_legacy,
+            meaningful = ptr_lci >= meaningful_threshold &
+              stl_seasonal_strength >= stl_strength_threshold) |>
+  arrange(desc(meaningful), desc(peak_trough_ratio))
 
-## Results table - drugs -------------------------------------------------
-
-if (stage3_legacy_inference) {
-  results_drug <- char_drug |>
-    transmute(bnf_drug_code, bnf_drug_name, bnf_class_name,
-              peak_trough_ratio = round(peak_trough_ratio, 3),
-              ptr_lci = round(ptr_lci, 3), ptr_uci = round(ptr_uci, 3),
-              peak_month, trough_month, modality,
-              seasonal_reproducibility = round(seasonal_reproducibility, 3),
-              stl_seasonal_strength = round(stl_seasonal_strength, 3),
-              stl_trend_strength    = round(stl_trend_strength, 3),
-              distribution, route,
-              p_adj_primary = p_adj, significant_primary = significant,
-              p_adj_all, sig_all, parent_class_sig,
-              meaningful = ptr_lci >= meaningful_threshold &
-                stl_seasonal_strength >= stl_strength_threshold) |>
-    arrange(desc(meaningful), desc(peak_trough_ratio))
-} else {
-  results_drug <- char_drug |>
-    transmute(bnf_drug_code, bnf_drug_name, bnf_class_name,
-              inference_scope = "secondary_exploratory",
-              multiplicity_family = "all_eligible_drugs",
-              peak_trough_ratio = round(peak_trough_ratio, 3),
-              ptr_lci = round(ptr_lci, 3), ptr_uci = round(ptr_uci, 3),
-              peak_month, trough_month, modality,
-              seasonal_reproducibility = round(seasonal_reproducibility, 3),
-              stl_seasonal_strength = round(stl_seasonal_strength, 3),
-              stl_trend_strength    = round(stl_trend_strength, 3),
-              distribution, route, drug_all_q_bh, drug_significant,
-              parent_class_significant, class_q_bh,
-              conditional_drug_q_legacy,
-              conditional_drug_significant_legacy,
-              meaningful = ptr_lci >= meaningful_threshold &
-                stl_seasonal_strength >= stl_strength_threshold) |>
-    arrange(desc(meaningful), desc(peak_trough_ratio))
-}
-
-## Figures ---------------------------------------------------------------
+### Compact diagnostic figures
 
 # observed + fitted monthly rate (per 1000 registered patients) for one class
 .fit_frame <- function(code) {
@@ -785,7 +673,7 @@ if (length(exemplar_class_codes)) {
          width = 9, height = 8, dpi = 300)
 }
 
-## Appendix assembly -----------------------------------------------------
+### Route summaries and crosswalks
 
 # distribution / route proportions across both levels
 appendix_routes <- bind_rows(
@@ -798,31 +686,30 @@ appendix_routes <- bind_rows(
 if (exists("xwalk_drug"))  fwrite(xwalk_drug,  file.path(data_dir, "appendix_recode_crosswalk_drug.csv"))
 if (exists("xwalk_class")) fwrite(xwalk_class, file.path(data_dir, "appendix_recode_crosswalk_class.csv"))
 
-## Save ------------------------------------------------------------------
+### Machine-readable primary outputs
 
 fwrite(results_class,   file.path(data_dir, "results_class.csv"))
 fwrite(results_drug,    file.path(data_dir, "results_drug.csv"))
 fwrite(appendix_routes, file.path(data_dir, "appendix_route_proportions.csv"))
 saveRDS(results_class,  file.path(data_dir, "results_class.rds"))
 saveRDS(results_drug,   file.path(data_dir, "results_drug.rds"))
-if (!stage3_legacy_inference) {
-  inference_scope_metadata <- data.table(
-    level = c("class", "drug", "hierarchy"),
-    analysis_role = c("primary_inferential", "secondary_exploratory", "not_applicable"),
-    multiplicity_family = c(
-      "all_eligible_classes", "all_eligible_drugs", "no_joint_hierarchical_family"
-    ),
-    family_size = c(nrow(screen_class), nrow(screen_drug), NA_integer_),
-    adjusted_value = c("class_q_bh", "drug_all_q_bh", NA_character_),
-    discovery_flag = c("class_significant", "drug_significant", NA_character_),
-    interpretation = c(
-      "BH FDR 5% within the complete eligible-class family.",
-      "BH FDR 5% within the complete eligible-drug family; hypothesis-generating.",
-      "Neither family is claimed to provide 5% FDR control across the whole hierarchy."
-    )
+# Record the two independent multiplicity families and their interpretation.
+inference_scope_metadata <- data.table(
+  level = c("class", "drug", "hierarchy"),
+  analysis_role = c("primary_inferential", "secondary_exploratory", "not_applicable"),
+  multiplicity_family = c(
+    "all_eligible_classes", "all_eligible_drugs", "no_joint_hierarchical_family"
+  ),
+  family_size = c(nrow(screen_class), nrow(screen_drug), NA_integer_),
+  adjusted_value = c("class_q_bh", "drug_all_q_bh", NA_character_),
+  discovery_flag = c("class_significant", "drug_significant", NA_character_),
+  interpretation = c(
+    "BH FDR 5% within the complete eligible-class family.",
+    "BH FDR 5% within the complete eligible-drug family; hypothesis-generating.",
+    "Neither family is claimed to provide 5% FDR control across the whole hierarchy."
   )
-  atomic_fwrite(inference_scope_metadata, file.path(data_dir, "inference_scope_metadata.csv"))
-}
+)
+atomic_fwrite(inference_scope_metadata, file.path(data_dir, "inference_scope_metadata.csv"))
 
 cat(sprintf(paste0(
   "Reporting outputs complete.\n",
@@ -842,16 +729,8 @@ print(results_class |> filter(meaningful) |>
         slice_head(n = 20))
 
 
-### 12. Publication outputs (tables and figures) ------------------------------
-# Writes publication-ready tables (meaningful column names, only the columns
-# needed) and figures into <data_dir>/results. Main-text and appendix material
-# are kept separate. Appendix includes observed+fitted panels for EVERY eligible
-# class and drug, paginated by BNF chapter, for visual inspection.
-#
-# Requires Sections 4-11 objects: covar, class_monthly_elig, drug_monthly_elig,
-# elig_class, elig_drug, screen_class, screen_drug, char_class, char_drug,
-# results_class, results_drug, coverage, excl_class, excl_drug, appendix_routes,
-# and the helpers .f_full, .nb_fit, .seasonal_curve. xwalk_drug is optional.
+## 02.7 Create publication-ready tables --------------------------------------
+# Format the primary objects into concise main-text and complete appendix tables.
 
 suppressMessages(library(ggplot2))
 stopifnot(exists("results_class"), exists("results_drug"), exists("char_class"),
@@ -881,14 +760,7 @@ relabel_route <- function(r) dplyr::case_when(
   r == "Poisson-LRT"        ~ "Poisson (LRT)",
   TRUE                      ~ r)
 
-# BNF class (paragraph) codes are stored internally as integers, so a leading
-# zero (chapters 1-9) is lost and long codes could take scientific form. Render
-# them zero-padded and DOTTED (e.g. "03.01.01" = chapter.section.paragraph):
-# the dots make the value intrinsically non-numeric, so it survives re-reading
-# in Excel or fread without being coerced back to a number. Drug (chemical
-# substance) codes contain letters so are already safe as character; the few
-# all-digit ones (e.g. some nutrition codes) are kept verbatim - read any
-# re-imported table with colClasses = "character" to preserve them exactly.
+# Render class codes as dotted text so leading zeros survive CSV/Excel import.
 bnf_class_dotted <- function(code) {
   s <- sprintf("%06d", as.integer(code))
   sub("^(\\d{2})(\\d{2})(\\d{2})$", "\\1.\\2.\\3", s)
@@ -902,188 +774,97 @@ chap_drug <- drug_monthly_elig |>
 
 ## ---- MAIN TEXT: Table 1, meaningful-seasonal classes ------------------------
 
-if (stage3_legacy_inference) {
-  main_table_classes <- results_class |>
-    filter(meaningful) |>
-    transmute(
-      `BNF class code`                = bnf_class_dotted(bnf_class_code),
-      `BNF class`                     = bnf_class_name,
-      `Peak-to-trough ratio (95% CI)` = fmt_ci(peak_trough_ratio, ptr_lci, ptr_uci),
-      `Peak month`                    = peak_month,
-      `Trough month`                  = trough_month,
-      `Seasonal shape`                = relabel_modality(modality),
-      `Seasonal strength`             = sprintf("%.2f", stl_seasonal_strength),
-      `Adjusted p`                    = fmt_p(p_adj))
-} else {
-  main_table_classes <- results_class |>
-    filter(meaningful) |>
-    transmute(
-      `BNF class code`                = bnf_class_dotted(bnf_class_code),
-      `BNF class`                     = bnf_class_name,
-      `Peak-to-trough ratio (95% CI)` = fmt_ci(peak_trough_ratio, ptr_lci, ptr_uci),
-      `Peak month`                    = peak_month,
-      `Trough month`                  = trough_month,
-      `Seasonal shape`                = relabel_modality(modality),
-      `Seasonal strength`             = sprintf("%.2f", stl_seasonal_strength),
-      `Class q (BH; all eligible classes)` = fmt_p(class_q_bh))
-}
+main_table_classes <- results_class |>
+  filter(meaningful) |>
+  transmute(
+    `BNF class code`                = bnf_class_dotted(bnf_class_code),
+    `BNF class`                     = bnf_class_name,
+    `Peak-to-trough ratio (95% CI)` = fmt_ci(peak_trough_ratio, ptr_lci, ptr_uci),
+    `Peak month`                    = peak_month,
+    `Trough month`                  = trough_month,
+    `Seasonal shape`                = relabel_modality(modality),
+    `Seasonal strength`             = sprintf("%.2f", stl_seasonal_strength),
+    `Class q (BH; all eligible classes)` = fmt_p(class_q_bh))
 fwrite(main_table_classes, file.path(tab_dir, "table1_meaningful_classes.csv"))
 
 ## ---- MAIN TEXT: Table 2, meaningful-seasonal drugs -------------------------
-# Parallel to Table 1 but drug-level. Stage 4 uses only the complete all-drug
-# family; parent-class significance is descriptive context, not a selection rule.
-if (stage3_legacy_inference) {
-  main_table_drugs <- results_drug |>
-    filter(meaningful) |>
-    transmute(
-      `BNF class code`                = sub("^(\\d{2})(\\d{2})(\\d{2})$", "\\1.\\2.\\3",
-                                            substr(as.character(bnf_drug_code), 1, 6)),
-      `BNF class`                     = bnf_class_name,
-      `BNF drug code`                 = as.character(bnf_drug_code),
-      `Drug (chemical substance)`     = bnf_drug_name,
-      `Peak-to-trough ratio (95% CI)` = fmt_ci(peak_trough_ratio, ptr_lci, ptr_uci),
-      `Peak month`                    = peak_month,
-      `Trough month`                  = trough_month,
-      `Seasonal shape`                = relabel_modality(modality),
-      `Seasonal strength`             = sprintf("%.2f", stl_seasonal_strength),
-      `In significant class`          = ifelse(parent_class_sig, "Yes", "No"),
-      `Adjusted p`                    = fmt_p(dplyr::coalesce(p_adj_primary, p_adj_all)))
-} else {
-  main_table_drugs <- results_drug |>
-    filter(meaningful) |>
-    transmute(
-      `BNF class code`                = sub("^(\\d{2})(\\d{2})(\\d{2})$", "\\1.\\2.\\3",
-                                            substr(as.character(bnf_drug_code), 1, 6)),
-      `BNF class`                     = bnf_class_name,
-      `BNF drug code`                 = as.character(bnf_drug_code),
-      `Drug (chemical substance)`     = bnf_drug_name,
-      `Peak-to-trough ratio (95% CI)` = fmt_ci(peak_trough_ratio, ptr_lci, ptr_uci),
-      `Peak month`                    = peak_month,
-      `Trough month`                  = trough_month,
-      `Seasonal shape`                = relabel_modality(modality),
-      `Seasonal strength`             = sprintf("%.2f", stl_seasonal_strength),
-      `Parent class significant`      = ifelse(parent_class_significant, "Yes", "No"),
-      `Drug q (BH; all eligible drugs)` = fmt_p(drug_all_q_bh))
-}
+# Parent-class significance is descriptive and does not select drug tests.
+main_table_drugs <- results_drug |>
+  filter(meaningful) |>
+  transmute(
+    `BNF class code`                = sub("^(\\d{2})(\\d{2})(\\d{2})$", "\\1.\\2.\\3",
+                                          substr(as.character(bnf_drug_code), 1, 6)),
+    `BNF class`                     = bnf_class_name,
+    `BNF drug code`                 = as.character(bnf_drug_code),
+    `Drug (chemical substance)`     = bnf_drug_name,
+    `Peak-to-trough ratio (95% CI)` = fmt_ci(peak_trough_ratio, ptr_lci, ptr_uci),
+    `Peak month`                    = peak_month,
+    `Trough month`                  = trough_month,
+    `Seasonal shape`                = relabel_modality(modality),
+    `Seasonal strength`             = sprintf("%.2f", stl_seasonal_strength),
+    `Parent class significant`      = ifelse(parent_class_significant, "Yes", "No"),
+    `Drug q (BH; all eligible drugs)` = fmt_p(drug_all_q_bh))
 fwrite(main_table_drugs, file.path(tab_dir, "table2_meaningful_drugs.csv"))
 
 ## ---- MAIN TEXT: analytic accounting (funnel) -------------------------------
 
-if (stage3_legacy_inference) {
-  sig_class_n <- sum(screen_class$significant, na.rm = TRUE)
-  sig_drug_n <- sum(screen_drug$significant, na.rm = TRUE)
-  accounting <- tibble::tibble(
-    Stage = c("Eligible series",
-              "Statistically significant (BH FDR 5%)",
-              "Significant but trivial amplitude (ratio < 1.05)",
-              "Meaningful seasonality (amplitude CI \u2265 threshold and seasonal strength \u2265 threshold)"),
-    Classes = c(sum(elig_class$eligible), sig_class_n,
-                sum(results_class$peak_trough_ratio < 1.05, na.rm = TRUE),
-                sum(results_class$meaningful, na.rm = TRUE)),
-    Drugs = c(sum(elig_drug$eligible), sig_drug_n,
-              sum(results_drug$peak_trough_ratio < 1.05, na.rm = TRUE),
-              sum(results_drug$meaningful, na.rm = TRUE)))
-} else {
-  sig_class_n <- sum(screen_class$class_significant, na.rm = TRUE)
-  sig_drug_n <- sum(screen_drug$drug_significant, na.rm = TRUE)
-  accounting <- tibble::tibble(
-    Stage = c("Eligible series",
-              "Statistically significant within stated complete family (BH FDR 5%)",
-              "Significant but trivial amplitude (ratio < 1.05)",
-              "Meaningful seasonality (amplitude CI \u2265 threshold and seasonal strength \u2265 threshold)"),
-    Classes = c(sum(elig_class$eligible), sig_class_n,
-                sum(results_class$peak_trough_ratio < 1.05, na.rm = TRUE),
-                sum(results_class$meaningful, na.rm = TRUE)),
-    Drugs = c(sum(elig_drug$eligible), sig_drug_n,
-              sum(results_drug$peak_trough_ratio < 1.05, na.rm = TRUE),
-              sum(results_drug$meaningful, na.rm = TRUE)),
-    `Class inference scope` = rep("Primary; all eligible classes", 4),
-    `Drug inference scope` = rep("Secondary exploratory; all eligible drugs", 4))
-}
+sig_class_n <- sum(screen_class$class_significant, na.rm = TRUE)
+sig_drug_n <- sum(screen_drug$drug_significant, na.rm = TRUE)
+accounting <- tibble::tibble(
+  Stage = c("Eligible series",
+            "Statistically significant within stated complete family (BH FDR 5%)",
+            "Significant but trivial amplitude (ratio < 1.05)",
+            "Meaningful seasonality (amplitude CI \u2265 threshold and seasonal strength \u2265 threshold)"),
+  Classes = c(sum(elig_class$eligible), sig_class_n,
+              sum(results_class$peak_trough_ratio < 1.05, na.rm = TRUE),
+              sum(results_class$meaningful, na.rm = TRUE)),
+  Drugs = c(sum(elig_drug$eligible), sig_drug_n,
+            sum(results_drug$peak_trough_ratio < 1.05, na.rm = TRUE),
+            sum(results_drug$meaningful, na.rm = TRUE)),
+  `Class inference scope` = rep("Primary; all eligible classes", 4),
+  `Drug inference scope` = rep("Secondary exploratory; all eligible drugs", 4))
 fwrite(accounting, file.path(tab_dir, "table_accounting.csv"))
 
 ## ---- APPENDIX: full class and drug results ---------------------------------
 
-if (stage3_legacy_inference) {
-  appendix_table_classes <- results_class |>
-    left_join(chap_class, by = "bnf_class_code") |>
-    transmute(
-      `BNF chapter` = bnf_chapter_name, `BNF class code` = bnf_class_dotted(bnf_class_code),
-      `BNF class` = bnf_class_name, `Peak-to-trough ratio` = sprintf("%.3f", peak_trough_ratio),
-      `95% CI lower` = sprintf("%.3f", ptr_lci), `95% CI upper` = sprintf("%.3f", ptr_uci),
-      `Peak month` = peak_month, `Trough month` = trough_month,
-      `Seasonal shape` = relabel_modality(modality),
-      `Seasonal strength (STL)` = sprintf("%.3f", stl_seasonal_strength),
-      `Trend strength (STL)` = sprintf("%.3f", stl_trend_strength),
-      `Cross-year reproducibility` = sprintf("%.3f", seasonal_reproducibility),
-      `Distribution` = tools::toTitleCase(distribution),
-      `Inference method` = relabel_route(route),
-      `HAC bandwidth capped` = ifelse(is.na(hac_capped), "", ifelse(hac_capped, "Yes", "No")),
-      `Adjusted p` = fmt_p(p_adj), `Meaningful seasonality` = ifelse(meaningful, "Yes", "No"))
-} else {
-  appendix_table_classes <- results_class |>
-    left_join(chap_class, by = "bnf_class_code") |>
-    transmute(
-      `BNF chapter` = bnf_chapter_name, `BNF class code` = bnf_class_dotted(bnf_class_code),
-      `BNF class` = bnf_class_name, `Inference scope` = "Primary inferential",
-      `Peak-to-trough ratio` = sprintf("%.3f", peak_trough_ratio),
-      `95% CI lower` = sprintf("%.3f", ptr_lci), `95% CI upper` = sprintf("%.3f", ptr_uci),
-      `Peak month` = peak_month, `Trough month` = trough_month,
-      `Seasonal shape` = relabel_modality(modality),
-      `Seasonal strength (STL)` = sprintf("%.3f", stl_seasonal_strength),
-      `Trend strength (STL)` = sprintf("%.3f", stl_trend_strength),
-      `Cross-year reproducibility` = sprintf("%.3f", seasonal_reproducibility),
-      `Distribution` = tools::toTitleCase(distribution),
-      `Inference method` = relabel_route(route),
-      `HAC bandwidth capped` = ifelse(is.na(hac_capped), "", ifelse(hac_capped, "Yes", "No")),
-      `Class q (BH; all eligible classes)` = fmt_p(class_q_bh),
-      `Meaningful seasonality` = ifelse(meaningful, "Yes", "No"))
-}
+appendix_table_classes <- results_class |>
+  left_join(chap_class, by = "bnf_class_code") |>
+  transmute(
+    `BNF chapter` = bnf_chapter_name, `BNF class code` = bnf_class_dotted(bnf_class_code),
+    `BNF class` = bnf_class_name, `Inference scope` = "Primary inferential",
+    `Peak-to-trough ratio` = sprintf("%.3f", peak_trough_ratio),
+    `95% CI lower` = sprintf("%.3f", ptr_lci), `95% CI upper` = sprintf("%.3f", ptr_uci),
+    `Peak month` = peak_month, `Trough month` = trough_month,
+    `Seasonal shape` = relabel_modality(modality),
+    `Seasonal strength (STL)` = sprintf("%.3f", stl_seasonal_strength),
+    `Trend strength (STL)` = sprintf("%.3f", stl_trend_strength),
+    `Cross-year reproducibility` = sprintf("%.3f", seasonal_reproducibility),
+    `Distribution` = tools::toTitleCase(distribution),
+    `Inference method` = relabel_route(route),
+    `HAC bandwidth capped` = ifelse(is.na(hac_capped), "", ifelse(hac_capped, "Yes", "No")),
+    `Class q (BH; all eligible classes)` = fmt_p(class_q_bh),
+    `Meaningful seasonality` = ifelse(meaningful, "Yes", "No"))
 fwrite(appendix_table_classes, file.path(tab_dir, "appendixA1_all_classes.csv"))
 
-if (stage3_legacy_inference) {
-  appendix_table_drugs <- results_drug |>
-    left_join(chap_drug, by = "bnf_drug_code") |>
-    transmute(
-      `BNF chapter` = bnf_chapter_name,
-      `BNF class code` = sub("^(\\d{2})(\\d{2})(\\d{2})$", "\\1.\\2.\\3",
-                             substr(as.character(bnf_drug_code), 1, 6)),
-      `BNF class` = bnf_class_name, `BNF drug code` = as.character(bnf_drug_code),
-      `Drug (chemical substance)` = bnf_drug_name,
-      `Peak-to-trough ratio` = sprintf("%.3f", peak_trough_ratio),
-      `95% CI lower` = sprintf("%.3f", ptr_lci), `95% CI upper` = sprintf("%.3f", ptr_uci),
-      `Peak month` = peak_month, `Trough month` = trough_month,
-      `Seasonal shape` = relabel_modality(modality),
-      `Seasonal strength (STL)` = sprintf("%.3f", stl_seasonal_strength),
-      `Trend strength (STL)` = sprintf("%.3f", stl_trend_strength),
-      `Distribution` = tools::toTitleCase(distribution), `Inference method` = relabel_route(route),
-      `In significant class` = ifelse(parent_class_sig, "Yes", "No"),
-      `Significant (within class)` = ifelse(significant_primary, "Yes", "No"),
-      `Adjusted p (within class)` = fmt_p(p_adj_primary),
-      `Significant (all-drug scan)` = ifelse(sig_all, "Yes", "No"),
-      `Adjusted p (all-drug scan)` = fmt_p(p_adj_all),
-      `Meaningful seasonality` = ifelse(meaningful, "Yes", "No"))
-} else {
-  appendix_table_drugs <- results_drug |>
-    left_join(chap_drug, by = "bnf_drug_code") |>
-    transmute(
-      `BNF chapter` = bnf_chapter_name,
-      `BNF class code` = sub("^(\\d{2})(\\d{2})(\\d{2})$", "\\1.\\2.\\3",
-                             substr(as.character(bnf_drug_code), 1, 6)),
-      `BNF class` = bnf_class_name, `BNF drug code` = as.character(bnf_drug_code),
-      `Drug (chemical substance)` = bnf_drug_name,
-      `Inference scope` = "Secondary exploratory",
-      `Peak-to-trough ratio` = sprintf("%.3f", peak_trough_ratio),
-      `95% CI lower` = sprintf("%.3f", ptr_lci), `95% CI upper` = sprintf("%.3f", ptr_uci),
-      `Peak month` = peak_month, `Trough month` = trough_month,
-      `Seasonal shape` = relabel_modality(modality),
-      `Seasonal strength (STL)` = sprintf("%.3f", stl_seasonal_strength),
-      `Trend strength (STL)` = sprintf("%.3f", stl_trend_strength),
-      `Distribution` = tools::toTitleCase(distribution), `Inference method` = relabel_route(route),
-      `Parent class significant` = ifelse(parent_class_significant, "Yes", "No"),
-      `Drug q (BH; all eligible drugs)` = fmt_p(drug_all_q_bh),
-      `Meaningful seasonality` = ifelse(meaningful, "Yes", "No"))
-}
+appendix_table_drugs <- results_drug |>
+  left_join(chap_drug, by = "bnf_drug_code") |>
+  transmute(
+    `BNF chapter` = bnf_chapter_name,
+    `BNF class code` = sub("^(\\d{2})(\\d{2})(\\d{2})$", "\\1.\\2.\\3",
+                           substr(as.character(bnf_drug_code), 1, 6)),
+    `BNF class` = bnf_class_name, `BNF drug code` = as.character(bnf_drug_code),
+    `Drug (chemical substance)` = bnf_drug_name,
+    `Inference scope` = "Secondary exploratory",
+    `Peak-to-trough ratio` = sprintf("%.3f", peak_trough_ratio),
+    `95% CI lower` = sprintf("%.3f", ptr_lci), `95% CI upper` = sprintf("%.3f", ptr_uci),
+    `Peak month` = peak_month, `Trough month` = trough_month,
+    `Seasonal shape` = relabel_modality(modality),
+    `Seasonal strength (STL)` = sprintf("%.3f", stl_seasonal_strength),
+    `Trend strength (STL)` = sprintf("%.3f", stl_trend_strength),
+    `Distribution` = tools::toTitleCase(distribution), `Inference method` = relabel_route(route),
+    `Parent class significant` = ifelse(parent_class_significant, "Yes", "No"),
+    `Drug q (BH; all eligible drugs)` = fmt_p(drug_all_q_bh),
+    `Meaningful seasonality` = ifelse(meaningful, "Yes", "No"))
 fwrite(appendix_table_drugs, file.path(tab_dir, "appendixA2_all_drugs.csv"))
 
 # coverage, exclusions, crosswalk, route proportions

@@ -1,11 +1,12 @@
-# Frozen-source import, aggregation, recoding, and Stage 2 quality control.
+# Module 01: frozen-source import, aggregation, recoding, and quality control.
 run_import_qc <- function(state) {
+  # Evaluate in the coordinator context so downstream modules receive these objects.
   evalq({
-### 2. Get data -------------
+## 01.1 Read the BNF lookup and monthly prescribing sources -------------------
 
-## BNF drug class lookup table
+### BNF class lookup
 
-# Retrived from https://opendata.nhsbsa.net/dataset/bnf-code-information-current-year (May 2025 version)
+# May 2025 BNF hierarchy snapshot from the NHSBSA open-data release.
 
 bnf_ref <- fread(bnf_path, colClasses = "character") %>% # Read in and force character to avoid dropping leading zeros
   select(BNF_SECTION,
@@ -21,9 +22,9 @@ bnf_ref <- as.data.table(bnf_ref)
 if (anyDuplicated(bnf_ref$bnf_class_code)) stop("BNF reference has duplicate class-code rows.")
 
 
-## EPD data. The 60 frozen archives are read once. Per-month aggregates and QC
-## files are checkpoints, so an interrupted run resumes without rereading
-## completed 6--8 GB uncompressed months.
+### English Prescribing Dataset
+# Per-month aggregates and QC files are resumable checkpoints, avoiding repeated
+# expansion of the 60 large frozen archives.
 
 stage2_dir <- file.path(out_dir, "qc", "stage2")
 epd_qc_month_dir <- file.path(stage2_dir, "epd_monthly")
@@ -49,6 +50,7 @@ if (partial_epd_run) {
   import_index <- seq_along(all_epd_ym)
 }
 
+# Resolve all checkpoint and QC paths for one prescribing month.
 epd_paths_for_month <- function(ym) {
   is_main <- ym %in% expected_ym
   list(
@@ -441,7 +443,7 @@ name_code_qc <- mapping_all[, .(
 atomic_fwrite(name_code_qc, file.path(stage2_dir, "epd_normalised_name_code_qc.csv"))
 
 
-## List size data
+## 01.2 Read and interpolate registered-patient denominators ------------------
 
 # Explicitly selected quarterly files from the England all-practice extracts.
 all_list_size_files <- c(list_size_files, list_size_2021_files)
@@ -588,13 +590,13 @@ if (nrow(list_size) != 48L || anyNA(list_size) || anyDuplicated(list_size$year_m
 atomic_fwrite(list_size, file.path(out_dir, "listsize.csv"))
 
 
-### 3. Process data -----------
+## 01.3 Assemble and validate monthly analysis panels -------------------------
 
-# `data_dir` and `expected_ym` were declared once in the setup section.
+# The coordinator defines the output directory and complete month sequence.
 
 fails <- character(0)   # validation failures collected, reported together
 
-# Ensure year month is in the same format across dataframes
+# Convert accepted source month formats to the common integer YYYYMM key.
 normalise_ym <- function(x, fname) {
   if (is.numeric(x)) return(as.integer(x))
   x <- trimws(as.character(x))
@@ -605,8 +607,9 @@ normalise_ym <- function(x, fname) {
                fname, paste(head(unique(x), 3), collapse = ", ")))
 }
 
-## Collate the monthly files for drug and drug class
+### Bind the monthly class and drug checkpoints
 
+# Validate each checkpoint before combining months.
 read_monthly_set <- function(prefix) {
   paths <- file.path(data_dir, sprintf("%s_%d.csv", prefix, expected_ym))
   missing <- paths[!file.exists(paths)]
@@ -710,7 +713,7 @@ if (qc_month[items_diff != 0, .N] > 0) {
 if (length(fails)) stop(paste(c("Input validation failed:", fails), collapse = "\n  - "))
 
 
-### 4. Create shared covariate data frame ---------
+## 01.4 Build the shared time, holiday, and offset covariates -----------------
 
 # Frozen England-and-Wales bank-holiday calendar and monthly working-day count.
 calendar_json <- jsonlite::fromJSON(calendar_path)
@@ -799,7 +802,7 @@ stopifnot(
   all(diff(covar$t) == 1)
 )
 
-## Stage 2 flow accounting and updated source manifest -------------------------------
+## 01.5 Record source flow and input-level QC ---------------------------------
 
 expected_all_epd_ym <- sort(c(expected_ym, window_ym))
 if (!identical(epd_file_qc$year_month, expected_all_epd_ym) ||
@@ -907,7 +910,7 @@ stage2_manifest[calendar_manifest_row, `:=`(
 setorder(stage2_manifest, source_id)
 atomic_fwrite(stage2_manifest, file.path(stage2_dir, "input_manifest_stage2.csv"))
 
-## Save pre-recode objects and quality-control outcomes -------------------------------
+## 01.6 Save validated panels before code reconciliation ----------------------
 
 qc_month <- merge(qc_month, working_days_monthly[, .(year_month, working_days)],
                   by = "year_month", all.x = TRUE, sort = TRUE)
@@ -935,9 +938,9 @@ cat(sprintf(paste0(
   format(max(covar$list_size), big.mark = ","),
   uniqueN(covar$list_size)))
 
-### 5. Reconcile recodes - in case BNF codes change between 2022-2025 for the same drug
+## 01.7 Reconcile BNF codes that changed during 2022–2025 ---------------------
 
-## normalise substance name so drift in spellings collapse
+# Normalise substance names so minor spelling drift maps to one candidate.
 normalise_name <- function(x) {
   x |>
     str_to_lower() |>
@@ -947,7 +950,7 @@ normalise_name <- function(x) {
     str_trim()
 }
 
-# Pick the code/name columns for a level
+# Resolve the code and label columns for one reconciliation level.
 .level_cols <- function(level) {
   switch(level,
          drug  = list(code = "bnf_drug_code",  name = "bnf_drug_name"),
@@ -955,7 +958,7 @@ normalise_name <- function(x) {
          stop("level must be 'drug' or 'class'"))
 }
 
-## Detect clusters that share a normalised name
+# Find same-name code histories that do not overlap in time.
 detect_recodes <- function(x, level = c("drug", "class"), n_months_req = 48L) {
   level <- match.arg(level)
   cols  <- .level_cols(level)
@@ -990,6 +993,7 @@ detect_recodes <- function(x, level = c("drug", "class"), n_months_req = 48L) {
     arrange(desc(combined_items))
 }
 
+# Apply an approved crosswalk and rebuild unique monthly series.
 apply_recode_crosswalk <- function(x, crosswalk, level = c("drug", "class")) {
   level <- match.arg(level)
   stopifnot(all(c("from_code", "to_code") %in% names(crosswalk)))
@@ -1042,7 +1046,7 @@ apply_recode_crosswalk <- function(x, crosswalk, level = c("drug", "class")) {
            bnf_drug_code, bnf_drug_name, items)
 }
 
-# Make list of candidates to re-include
+# Identify non-overlapping code histories that may describe one substance.
 if (exists("drug_monthly")) {
   cand_drug <- detect_recodes(drug_monthly, "drug")
   message("cand_drug: ", nrow(cand_drug), " candidate cluster(s).")
@@ -1054,19 +1058,19 @@ if (exists("class_monthly")) {
   if (exists("out_dir")) readr::write_csv(cand_class, file.path(out_dir, "recode_candidates_class.csv"))
 }
 
-# Review candidates - no candidate classes, only beclomet is candidate for drugs to reinclude
+# Apply the prespecified, manually reviewed beclometasone code reconciliation.
 cand_drug
 cand_class
 
 cand_drug |> filter(heals_to_full, combined_items >= 4000)   # keeps the only candidate we need
 
-# Select which of the codes we want to keep for this
+# Map the retired code to the retained current code.
 cand_drug |> slice(1) |> pull(codes)     # the two full codes for the line below
 drug_monthly |> filter(bnf_drug_code %in% c("0301011AB","0302000AA")) |>
   group_by(bnf_drug_code) |>
   summarise(first = min(year_month), last = max(year_month), items = sum(items), .groups = "drop")
 
-# Unify codes so same code is used for the above candidate drug
+# Rebuild the drug series after applying the approved crosswalk.
 xwalk_drug <- tibble::tribble(
   ~from_code,   ~to_code,
   "0301011AB",  "0302000AA"   # Trimbow: reconciled to the current (2025) corticosteroid code
@@ -1103,7 +1107,7 @@ pre_recode_drug_items <- drug_monthly_before_recode[, sum(items)]
 pre_recode_class_items <- as.data.table(class_monthly)[, sum(items)]
 drug_monthly <- apply_recode_crosswalk(drug_monthly, xwalk_drug, "drug")
 
-# Rederive class_monthly
+# Re-derive class totals from the reconciled drug panel.
 class_monthly <- drug_monthly |>
   group_by(year_month, bnf_chapter_code, bnf_chapter_name, bnf_section_code,
            bnf_section_name, bnf_class_code, bnf_class_name) |>
@@ -1178,8 +1182,9 @@ if (!recode_pass) stop("The accepted drug-code recode failed a preservation or u
 atomic_save_rds(class_monthly, file.path(data_dir, "class_monthly.rds"))
 atomic_save_rds(drug_monthly, file.path(data_dir, "drug_monthly.rds"))
 
-## Final Stage 2 gate ---------------------------------------------------------------
+## 01.8 Apply the final import and source-QC gate ------------------------------
 
+# Represent one result in the final import/QC gate.
 stage2_check <- function(check_id, passed, observed, requirement) {
   data.table(
     check_id = check_id,

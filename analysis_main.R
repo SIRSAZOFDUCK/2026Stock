@@ -1,7 +1,7 @@
 #### SEASONALITY IN PRIMARY CARE PRESCRIBING IN ENGLAND PRIMARY CARE 
 #### Nadine Stock, Gillian Carr, Islam Omar, Saran Shantikumar, July 2026
 
-### 1. Set up ----------
+## Coordinator: runtime, inputs, provenance, and stage dispatch ----------------
 
 .run_analysis <- function() {
 
@@ -16,8 +16,8 @@ if (!identical(as.character(getRversion()), canonical_r_version) || nzchar(R.ver
   )
 }
 
-# Resolve the Analysis project root from the executed file, with getwd() as an
-# interactive fallback. No later section changes the working directory.
+# Resolve the repository root from the executed file, with getwd() as the
+# interactive fallback. Modules use this path without changing directories.
 script_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
 analysis_dir <- if (length(script_arg) == 1L) {
   dirname(normalizePath(sub("^--file=", "", script_arg), mustWork = TRUE))
@@ -28,23 +28,23 @@ analysis_dir <- if (length(script_arg) == 1L) {
 # Modules define cohesive pipeline stages; all run in this function's explicit
 # context so the established object names and stage interface remain stable.
 module_files <- c(
-  "R/02_import_qc.R",
-  "R/03_primary_analysis.R",
-  "R/05_sensitivities.R",
-  "R/06_diagnostics.R",
-  "R/07_reporting.R"
+  "R/01_import_qc.R",
+  "R/02_primary_analysis.R",
+  "R/03_sensitivities.R",
+  "R/04_diagnostics.R",
+  "R/05_reporting.R"
 )
 for (module_file in module_files) {
   source(file.path(analysis_dir, module_file), local = environment())
 }
 
 if (!requireNamespace("renv", quietly = TRUE)) {
-  stop("renv is not available. From Analysis, run renv::restore() before the analysis.")
+  stop("renv is not available. From the repository root, run renv::restore() before the analysis.")
 }
 active_project <- tryCatch(renv::project(), error = function(e) "")
 if (!nzchar(active_project) ||
     !identical(normalizePath(active_project, mustWork = TRUE), analysis_dir)) {
-  stop("The Analysis renv project is not active. Start R/Rscript from the Analysis directory and rerun.")
+  stop("The repository renv project is not active. Start R/Rscript from the repository root and rerun.")
 }
 
 # Authoritative analysis constants. Later sensitivity specifications are added
@@ -167,6 +167,7 @@ list_size_2021_files <- file.path(
   ls_dir, sprintf("gp-reg-pat-prac-all_%d.csv", list_size_2021_ym)
 )
 
+# Validate all frozen inputs before any source archive is opened.
 declared_inputs <- c(bnf_path, calendar_path, epd_files, epd_2021_files,
                      list_size_files, list_size_2021_files)
 missing_inputs <- declared_inputs[!file.exists(declared_inputs)]
@@ -182,6 +183,7 @@ archive_executable <- Sys.which("bsdtar")
 if (!nzchar(archive_executable)) {
   stop("The system 'bsdtar' executable is required to read the ZIP 6.3-compressed frozen EPD archives.")
 }
+# Stream an EPD archive directly into data.table without extracting it to disk.
 read_epd_archive <- function(path, select = NULL, nrows = Inf, colClasses = NULL) {
   data.table::fread(
     cmd = paste(shQuote(archive_executable), "-xOf", shQuote(path)),
@@ -199,6 +201,7 @@ read_epd_header <- function(path) {
   )
 }
 
+# Promote completed checkpoints atomically so partial files cannot be reused.
 atomic_fwrite <- function(x, path) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   tmp <- paste0(path, ".tmp")
@@ -217,6 +220,7 @@ atomic_save_rds <- function(x, path) {
 
 is_blank <- function(x) is.na(x) | trimws(as.character(x)) == ""
 
+# Use either common system implementation to calculate SHA-256 provenance.
 sha256_file <- function(path) {
   if (!file.exists(path)) return(NA_character_)
   shasum <- Sys.which("shasum")
@@ -231,6 +235,7 @@ sha256_file <- function(path) {
   sub("[[:space:]].*$", "", ans[1])
 }
 
+# Record the exact runtime and source-code hashes for this execution route.
 repro_dir <- file.path(out_dir, "qc", provenance_stage, "reproducibility")
 dir.create(repro_dir, recursive = TRUE, showWarnings = FALSE)
 script_path <- file.path(analysis_dir, "analysis_main.R")
@@ -297,11 +302,11 @@ if (setup_only) {
 
 withCallingHandlers({
 
-
-
+# Import/QC may stop cleanly after a requested month or the Stage 2 route.
 if (!run_import_qc(environment())) return(invisible(TRUE))
 run_primary_analysis(environment())
 
+# Sensitivity and diagnostic routes stop after writing their own gated outputs.
 if (run_stage == "stage5_trend") {
   run_trend_sensitivity(environment())
   return(invisible(TRUE))
@@ -323,6 +328,7 @@ if (run_stage == "stage6") {
   return(invisible(TRUE))
 }
 
+# Only the full route continues into publication and window-assessment figures.
 run_reporting(environment())
 
 }, warning = function(w) {

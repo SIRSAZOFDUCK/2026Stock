@@ -7,11 +7,11 @@ The monthly prescribing archives and registered-patient files are **not distribu
 ## Repository contents
 
 - `analysis_main.R` — short authoritative coordinator that validates the runtime and dispatches each analysis stage.
-- `R/02_import_qc.R` — frozen-source import, aggregation, recoding and Stage 2 quality control.
-- `R/03_primary_analysis.R` — eligibility, model fitting, characterisation and primary result tables.
-- `R/05_sensitivities.R` — the four prespecified trend, HAC, working-day and threshold sensitivity analyses.
-- `R/06_diagnostics.R` — targeted diagnostics, cohort flow and missingness accounting.
-- `R/07_reporting.R` — publication figures and the prespecified 2021 window diagnostics.
+- `R/01_import_qc.R` — frozen-source import, aggregation, recoding and source quality control.
+- `R/02_primary_analysis.R` — eligibility, model fitting, characterisation and primary result tables.
+- `R/03_sensitivities.R` — the four prespecified trend, HAC, working-day and threshold sensitivity analyses.
+- `R/04_diagnostics.R` — targeted diagnostics, cohort flow and missingness accounting.
+- `R/05_reporting.R` — publication figures and the prespecified 2021 window diagnostics.
 - `verify_inputs.R` — verifies every acquired source against the frozen size and SHA-256 manifest before analysis.
 - `renv.lock`, `.Rprofile`, `renv/activate.R`, `renv/settings.json`, `DESCRIPTION` — the exact R 4.6.1 project environment.
 - `reproducibility/input_manifest.csv` — 82-source provenance record with publisher, period, canonical URL, licence, schema, expected filename, size and SHA-256.

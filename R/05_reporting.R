@@ -1,7 +1,8 @@
-# Publication figures and the prespecified 2021 window diagnostics.
+# Module 05: publication figures and the prespecified 2021 window assessment.
 run_reporting <- function(state) {
+  # Reuse primary objects from the coordinator context; no model definitions change here.
   evalq({
-## ---- shared plotting theme --------------------------------------------------
+## 05.1 Shared plotting theme and fit-frame helper ----------------------------
 
 theme_pub <- theme_bw(base_size = 11) +
   theme(strip.background = element_rect(fill = "grey92", colour = NA),
@@ -9,7 +10,7 @@ theme_pub <- theme_bw(base_size = 11) +
         panel.grid.minor = element_blank(),
         plot.title = element_text(face = "bold"))
 
-# observed + fitted rate (per 1000 patients) for one class or drug series
+# Return observed and fitted rates per 1,000 registered patients for one series.
 .series_fit <- function(mon, id_col, id_val) {
   ser <- mon |> filter(.data[[id_col]] == id_val) |> select(year_month, items)
   d   <- covar |> left_join(ser, by = "year_month") |> arrange(t)
@@ -20,7 +21,7 @@ theme_pub <- theme_bw(base_size = 11) +
          fitted   = as.numeric(fitted(fit)) / d$list_size * 1000)
 }
 
-## ---- MAIN TEXT figures: exemplars ------------------------------------------
+## 05.2 Main-text exemplar and seasonality-landscape figures -----------------
 
 exemplar_codes <- results_class |>
   filter(meaningful, peak_trough_ratio < 10) |>
@@ -103,8 +104,9 @@ if (nrow(land)) {
   ggsave(file.path(fig_dir, "Figure1_seasonality_landscape.png"), p3, width = 11, height = 8, dpi = 300)
 }
 
-## ---- APPENDIX figure: genuine vs excluded (why exclusions were made) --------
+## 05.3 Appendix comparison of retained and excluded discoveries --------------
 
+# Resolve named class exemplars to their stable BNF codes.
 pick <- function(nm) results_class$bnf_class_code[match(nm, results_class$bnf_class_name)]
 compare_codes <- na.omit(c(
   kept    = pick("Tetracyclines"), kept2 = pick("Antihistamines"), kept3 = pick("Penicillins"),
@@ -128,21 +130,18 @@ if (length(compare_codes) >= 2) {
   ggsave(file.path(fig_dir, "FigureS2_retained_vs_nonmeaningful.png"), p4, width = 9, height = 8, dpi = 300)
 }
 
-## ---- APPENDIX figures: ALL series, observed + fitted, paginated by chapter --
-# Every eligible series is plotted. Facet-strip colour flags analytic status:
-#   dark red + white text  = meaningful seasonality
-#   pale red + dark text    = statistically significant but not meaningful
-#   default grey            = eligible but not significant
-# Strips are recoloured on the plot's grob, matched to each panel by its label.
+## 05.4 Paginated observed-and-fitted appendix figures ------------------------
+# Plot every eligible series. Strip colours distinguish meaningful, significant,
+# and eligible-only series, matched to panels by their display labels.
 
-# read a facet strip's panel label
+# Read a facet strip's panel label.
 .strip_label <- function(sg) {
   gt <- sg$grobs[[1]]
   for (ch in gt$children) if (!is.null(ch$children))
     for (tx in ch$children) if (!is.null(tx$label)) return(tx$label)
   NA_character_
 }
-# recolour one strip: background fill + text colour
+# Set one facet strip's background and text colours.
 .recolour_strip <- function(sg, fill, textcol) {
   gt <- sg$grobs[[1]]
   for (i in seq_along(gt$children)) {
@@ -160,7 +159,7 @@ if (length(compare_codes) >= 2) {
   }
   sg$grobs[[1]] <- gt; sg
 }
-# apply a tier lookup (named list: label -> c(fill, textcol)) to all strips
+# Apply a named label-to-colour lookup across all facet strips.
 .style_strips <- function(p, tier_map) {
   g <- ggplotGrob(p)
   for (si in which(grepl("^strip", g$layout$name))) {
@@ -213,10 +212,8 @@ if (length(compare_codes) >= 2) {
   invisible(NULL)
 }
 
-# tier colour lookups keyed by series NAME (meaningful takes precedence over
-# significant). results_* contain only significant/characterised series; the
-# `meaningful` column marks the top tier. Stage 4/full runs use the complete
-# all-eligible-drug BH family as the sole drug-level significance definition.
+# Tier lookups are keyed by display name; meaningful status takes precedence.
+# Drug significance always comes from the complete eligible-drug BH family.
 FILL_MEAN <- "#8B0000"; TXT_MEAN <- "white"
 FILL_SIG  <- "#E8A0A0"; TXT_SIG  <- "grey15"
 tier_class <- {
@@ -226,11 +223,7 @@ tier_class <- {
   m
 }
 tier_drug <- {
-  sig <- if (stage3_legacy_inference) {
-    (results_drug$significant_primary %in% TRUE) | (results_drug$sig_all %in% TRUE)
-  } else {
-    results_drug$drug_significant %in% TRUE
-  }
+  sig <- results_drug$drug_significant %in% TRUE
   m <- setNames(vector("list", nrow(results_drug)), results_drug$bnf_drug_name)
   for (i in seq_len(nrow(results_drug)))
     m[[i]] <- if (isTRUE(results_drug$meaningful[i])) c(FILL_MEAN, TXT_MEAN)
@@ -252,11 +245,7 @@ tier_class_shape <- {
   m
 }
 tier_drug_shape <- {
-  sig <- if (stage3_legacy_inference) {
-    (results_drug$significant_primary %in% TRUE) | (results_drug$sig_all %in% TRUE)
-  } else {
-    results_drug$drug_significant %in% TRUE
-  }
+  sig <- results_drug$drug_significant %in% TRUE
   m <- setNames(vector("list", nrow(results_drug)), results_drug$bnf_drug_name)
   for (i in seq_len(nrow(results_drug)))
     m[[i]] <- if (isTRUE(results_drug$meaningful[i])) c(FILL_MEAN_SHAPE, TXT_MEAN_SHAPE)
@@ -265,6 +254,7 @@ tier_drug_shape <- {
   m[!vapply(m, is.null, logical(1))]
 }
 
+# Render every eligible series on fixed 4 × 4 chapter-specific PDF pages.
 render_all_series <- function(mon, id_col, name_col, chap_lookup, out_pdf,
                               tier_map = list(), per_page = 16L, ncol = 4L) {
   if (per_page != 16L || ncol != 4L) {
@@ -325,18 +315,13 @@ render_all_series(drug_monthly_elig, "bnf_drug_code", "bnf_drug_name",
                   chap_drug, file.path(fig_dir, "S4. appendix_all_drugs_by_chapter.pdf"),
                   tier_map = tier_drug, per_page = 16L, ncol = 4L)
 
-## ---- APPENDIX figures: ALL fitted seasonal SHAPES, paginated by chapter ----
-# Same tiered strip colouring, but showing the fitted seasonal curve (the
-# multiplicative factor by calendar month, as in figure2_seasonal_shape.png)
-# for every eligible series rather than observed+fitted counts. Fit is Poisson
-# throughout regardless of a series' inferential route - this is a visual shape
-# summary, not the inferential model, exactly as for the observed+fitted
-# appendix. A flat/noisy curve for a non-significant series is itself
-# informative (it shows there is nothing there), so all eligible series are
-# included, not just significant ones.
+## 05.5 Paginated fitted-seasonal-shape appendix figures ----------------------
+# Show the fitted monthly factor for every eligible series. Poisson fits provide
+# a common visual summary only; inferential routes remain those selected earlier.
 FILL_MEAN_SHAPE <- "#08306B"; TXT_MEAN_SHAPE <- "white"   # dark blue
 FILL_SIG_SHAPE  <- "#9ECAE1"; TXT_SIG_SHAPE  <- "grey15"   # pale blue
 
+# Convert one fitted harmonic curve to factors relative to its annual mean.
 .series_shape <- function(mon, id_col, id_val) {
   ser <- mon |> filter(.data[[id_col]] == id_val) |> select(year_month, items)
   d   <- covar |> left_join(ser, by = "year_month") |> arrange(t)
@@ -348,7 +333,7 @@ FILL_SIG_SHAPE  <- "#9ECAE1"; TXT_SIG_SHAPE  <- "grey15"   # pale blue
   tibble(month = 1:12, factor = f / mean(f))
 }
 
-# shared per-page label/tier assembly (duplicate names disambiguated by code)
+# Build unique per-page labels and matching status colours.
 .page_labels <- function(rows, name_col, id_col, tier_map) {
   nm  <- rows[[name_col]]
   dup <- nm %in% nm[duplicated(nm)]
@@ -357,6 +342,7 @@ FILL_SIG_SHAPE  <- "#9ECAE1"; TXT_SIG_SHAPE  <- "grey15"   # pale blue
   list(labels = panel_label, tier = tier[!vapply(tier, is.null, logical(1))])
 }
 
+# Render all seasonal-shape panels with the same fixed pagination.
 render_all_shapes <- function(mon, id_col, name_col, chap_lookup, out_pdf,
                               tier_map = list(), per_page = 16L, ncol = 4L) {
   if (per_page != 16L || ncol != 4L) {
@@ -408,7 +394,7 @@ render_all_shapes(drug_monthly_elig, "bnf_drug_code", "bnf_drug_name", chap_drug
                   file.path(fig_dir, "S6. appendix_all_drugs_seasonal_shape_by_chapter.pdf"),
                   tier_map = tier_drug_shape, per_page = 16L, ncol = 4L)
 
-## ---- report -----------------------------------------------------------------
+### Report created files and headline counts
 
 cat(sprintf(paste0(
   "Publication outputs written to %s\n",
@@ -420,18 +406,9 @@ cat(sprintf(paste0(
   "  Main-text meaningful classes: %d | eligible classes plotted: %d | eligible drugs plotted: %d\n"),
   res_dir, nrow(main_table_classes),
   n_distinct(class_monthly_elig$bnf_class_code), n_distinct(drug_monthly_elig$bnf_drug_code)))
-### 14. Window-justification figure: where does the pandemic disruption sit? -----
-# Descriptive only (no model is refitted). Reads the 2021 EPD and 2021 list-size
-# data, aggregates 2021 to national monthly totals by BNF class, and plots the
-# raw monthly prescribing rate across 2021-2025 for a set of representative
-# classes, with 2021 (the excluded year) shaded. This shows empirically that the
-# most severe disruption is confined to 2021 and that a regular annual pattern is
-# re-established from 2022, supporting the choice of analytic window. It does not
-# alter any object produced by Sections 2-13.
-#
-# Requires Sections 3-11 objects: covar, class_monthly, class_monthly_elig,
-# results_class. Reads 2021 raw data from the same drives as Section 2. Caches
-# the (small) 2021 class aggregates so the 1 GB monthly files are read only once.
+## 05.6 Assess the exclusion of the pandemic-disrupted 2021 window ------------
+# This descriptive extension combines cached 2021 class totals with the
+# 2022–2025 analysis panel. It does not refit or alter the primary models.
 
 stopifnot(exists("out_dir"), exists("covar"), exists("results_class"),
           exists("class_monthly_elig"))
@@ -439,9 +416,7 @@ if (!exists("data_dir")) data_dir <- out_dir
 if (!exists("class_monthly"))
   class_monthly <- readRDS(file.path(data_dir, "class_monthly.rds"))
 
-# --- editable: representative seasonal classes (matched by exact BNF class name).
-#     A high-volume non-significant class is appended automatically as a flat
-#     control, so leave room for it (aim for <= 5 named here).
+# Named seasonal exemplars are matched exactly; one high-volume flat control is added.
 exemplar_names <- c(
   "Penicillins",                 # winter antibiotic (COVID-suppressed 2020-21)
   "Macrolides",                  # winter antibiotic
@@ -450,7 +425,7 @@ exemplar_names <- c(
   "Sunscreening preparations"    # summer dermatological
 )
 
-## 14a. Aggregate the 2021 EPD to national monthly totals per BNF class ---------
+### 05.6a Aggregate 2021 prescribing to monthly class totals
 # Cached per month (all chapter 1-14 classes, so the cache is reusable even if
 # the exemplar set is changed later); the heavy CSV is read only when uncached.
 
@@ -494,7 +469,7 @@ n_months_2021 <- uniqueN(class_2021$year_month)
 if (n_months_2021 < 12L)
   warning(sprintf("Only %d of 12 months of 2021 EPD are present.", n_months_2021))
 
-## 14b. National monthly list size for 2021 (quarterly -> monthly by LOCF) ------
+### 05.6b Convert quarterly 2021 list size to monthly denominators
 
 ls_2021_files <- list_size_2021_files
 
@@ -516,7 +491,7 @@ ls2021 <- data.table(date = seq(window_start, window_end, by = "month")) |>
 ls_all <- bind_rows(ls2021, covar |> transmute(year_month, list_size)) |>
   arrange(year_month)
 
-## 14c. Choose exemplar classes (named seasonal + one flat control) -------------
+### 05.6c Select named seasonal exemplars and one flat control
 
 ex <- results_class |>
   distinct(bnf_class_code, bnf_class_name) |>
@@ -545,7 +520,7 @@ ex_ord <- ex |>
   arrange(desc(peak_trough_ratio))
 facet_levels <- unique(c(ex_ord$bnf_class_name, flat$bnf_class_name))
 
-## 14d. Build the 2021-2025 rate series and plot --------------------------------
+### 05.6d Build and plot the 2021–2025 rate series
 
 items_all <- bind_rows(
   class_2021    |> transmute(year_month, bnf_class_code = as.character(bnf_class_code), items),
@@ -594,7 +569,7 @@ fwrite(plot_df |> select(bnf_class_code, bnf_class_name, year_month, items, list
        file.path(res_dir, "tables", "window_justification_rates.csv"))
 
 cat(sprintf(paste0(
-  "Section 14 complete (window-justification figure).\n",
+  "Window-justification figure complete.\n",
   "  2021 EPD months aggregated: %d/12\n",
   "  Exemplar classes plotted:   %s\n",
   "  Figure: %s\n"),
@@ -603,20 +578,14 @@ cat(sprintf(paste0(
   file.path(fig_dir, "figure_window_justification_2021_2025.png")))
 
 
-### 14e. Systematic 2021-anomaly scan across all eligible drug classes ----------
-# Diagnostic only. For every eligible class, quantify how far 2021 departs from
-# the pattern established over 2022-2025, to locate where pandemic residue sits.
-#   level: 2021 mean log-rate vs a LINEAR back-extrapolation of the 2022-2025
-#          trend (so a merely growing/shrinking class is not flagged); reported
-#          as % deviation and in residual-SD units.
-#   shape: correlation of 2021's within-year (mean-centred) profile with the mean
-#          2022-2025 profile, judged against the 2022-2025 year-to-year baseline.
-# Reuses the 14a all-class 2021 cache and the 14b denominator - no new data.
+### 05.6e Scan 2021 anomalies across all eligible classes
+# Compare 2021 with the 2022–2025 level trend and mean within-year shape.
+# Reuse the 05.6a class cache and 05.6b denominator without reading new data.
 
-stopifnot(exists("ls_all"), exists("res_dir"))          # from 14b / 14d
+stopifnot(exists("ls_all"), exists("res_dir"))          # built in 05.6b / 05.6d
 if (!exists("class_2021")) {
   cf <- list.files(cache_dir_2021, pattern = "^data_byclass_2021_\\d{6}\\.csv$", full.names = TRUE)
-  if (!length(cf)) stop("No 2021 class cache found - run Section 14a first.")
+  if (!length(cf)) stop("No 2021 class cache found; run subsection 05.6a first.")
   class_2021 <- rbindlist(lapply(cf, function(f) fread(
     f, colClasses = list(character = c(
       "bnf_chapter_code", "bnf_section_code", "bnf_class_code"
@@ -646,8 +615,10 @@ panel[, `:=`(year = year_month %/% 100L, month = year_month %% 100L,
              rate = items / list_size * 1000)]
 setorder(panel, bnf_class_code, year_month)
 
-idx <- function(ym) (ym %/% 100L - 2022L) * 12L + (ym %% 100L)   # 2022-01 -> 1
+# Map YYYYMM to a continuous month index beginning at January 2022.
+idx <- function(ym) (ym %/% 100L - 2022L) * 12L + (ym %% 100L)
 
+# Compare 2021 level and within-year shape with the 2022–2025 reference pattern.
 scan_one <- function(d) {
   d <- d[order(year_month)]
   rest <- d[year >= 2022]; y21 <- d[year == 2021]
@@ -678,7 +649,7 @@ scan[, flagged     := flag_level | flag_shape]
 setorder(scan, level_dev_pct)
 fwrite(scan, file.path(res_dir, "tables", "window_2021_anomaly_scan.csv"))
 
-## summary ---------------------------------------------------------------------
+#### Summarise level and shape flags
 cat(sprintf("\n2021 anomaly scan: %d eligible classes\n", nrow(scan)))
 cat(sprintf("  flagged (level >=2 SD off trend OR shape gap >=0.30): %d\n", sum(scan$flagged)))
 cat(sprintf("    of which 2021 lower: %d | 2021 higher: %d\n",
@@ -695,7 +666,7 @@ print(scan[order(-shape_gap)][1:12,
                               .(bnf_class_name, shape_gap = round(shape_gap, 2),
                                 level_dev_pct = round(level_dev_pct, 0))])
 
-## plot the 9 classes whose 2021 level departs most (either direction) ----------
+#### Plot the nine largest absolute 2021 level departures
 sel <- scan[order(-abs(level_dev_pct))][1:9]
 lab <- setNames(sprintf("%s (2021 %+.0f%%)", sel$bnf_class_name, sel$level_dev_pct),
                 sel$bnf_class_code)
@@ -720,22 +691,14 @@ ggsave(file.path(res_dir, "figures", "figure_window_2021_anomaly_top9.png"),
 
 cat(sprintf("\nSaved: window_2021_anomaly_scan.csv and figure_window_2021_anomaly_top9.png\n"))
 
-### 14f. Plot every eligible class, 2021-2025, for visual window selection ------
-# Diagnostic. One paginated PDF (A4 landscape) with every eligible class's raw
-# monthly rate across 2021-2025, 2021 shaded, faceted and paginated by BNF
-# chapter. Facet strips are recoloured by the 14e flags so disrupted classes are
-# findable at a glance:
-#   red   = flagged on LEVEL (2021 >= 2 residual-SD off the 2022-2025 trend)
-#   blue  = flagged on SHAPE (within-year profile gap >= 0.30) only
-#   grey  = not flagged
-# Each strip shows the class name plus its signed 2021 level deviation.
-# Requires 14e objects: panel, scan. Reuses .style_strips / .recolour_strip /
-# .strip_label from Section 12 if present (redefined here if not).
+### 05.6f Plot every eligible class across 2021–2025
+# Plot every eligible class by chapter with 2021 shaded. Strips are red for
+# level disruption, blue for shape-only disruption, and grey otherwise.
 
 stopifnot(exists("panel"), exists("scan"), exists("res_dir"))
 suppressMessages(library(ggplot2))
 
-# --- strip-recolouring helpers (reuse Section 12's if already defined) --------
+# Define strip helpers only if the appendix setup did not already create them.
 if (!exists(".strip_label")) {
   .strip_label <- function(sg) {
     gt <- sg$grobs[[1]]
@@ -775,7 +738,7 @@ if (!exists(".style_strips")) {
   }
 }
 
-# tier colours
+# Colour level disruptions red, shape-only disruptions blue, and others grey.
 FILL_LEVEL <- "#B2182B"; TXT_LEVEL <- "white"    # level-disrupted (strongest signal)
 FILL_SHAPE <- "#2166AC"; TXT_SHAPE <- "white"    # shape-disrupted only
 FILL_NONE  <- "grey92";  TXT_NONE  <- "grey15"   # not flagged
@@ -791,7 +754,8 @@ sc <- as.data.table(scan)[, .(bnf_class_code, bnf_class_name, bnf_chapter_code,
 sc[, base_label := sprintf("%s (2021 %+.0f%%)", bnf_class_name, round(level_dev_pct))]
 sc[, tier := fifelse(flag_level, "level", fifelse(flag_shape, "shape", "none"))]
 
-order_key <- function(dt) dt[order(bnf_chapter_code, -abs(level_dev_pct))]  # worst first within chapter
+# Put the largest absolute departures first within each chapter.
+order_key <- function(dt) dt[order(bnf_chapter_code, -abs(level_dev_pct))]
 sc <- order_key(sc)
 
 out_pdf <- file.path(res_dir, "figures", "S1. figure_window_all_classes_2021_2025.pdf")
@@ -854,7 +818,7 @@ for (ch in unique(sc$bnf_chapter_code)) {
 dev.off()
 
 cat(sprintf(paste0(
-  "Section 14f complete.\n",
+  "All-class window plots complete.\n",
   "  All %d eligible classes plotted 2021-2025 -> %s\n",
   "  Strip colour: red = level-disrupted (%d), blue = shape-only (%d), grey = stable (%d)\n"),
   nrow(sc), out_pdf,

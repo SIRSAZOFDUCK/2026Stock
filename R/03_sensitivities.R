@@ -1,6 +1,8 @@
-# Prespecified sensitivity analyses, each operating on the shared run context.
+# Module 03: prespecified trend, inference, offset, and threshold sensitivities.
 
+## 03.1 Secular-trend specification sensitivity -------------------------------
 run_trend_sensitivity <- function(state) {
+  # Compare the primary spline with linear and four-degree spline trends.
   evalq({
   trend_dir <- file.path(out_dir, "qc", "stage5", "trend")
   trend_snapshot_dir <- file.path(trend_dir, "trend_snapshot")
@@ -8,6 +10,7 @@ run_trend_sensitivity <- function(state) {
   stage4_snapshot_dir <- file.path(stage4_dir, "stage4_snapshot")
   dir.create(trend_snapshot_dir, recursive = TRUE, showWarnings = FALSE)
 
+  # Collect named gates in one table for release review.
   trend_checks <- list()
   add_trend_check <- function(check_id, pass, expected, observed, details = "") {
     trend_checks[[length(trend_checks) + 1L]] <<- data.table(
@@ -16,8 +19,7 @@ run_trend_sensitivity <- function(state) {
     )
   }
 
-  # The sensitivity starts from the sealed Stage 4 authority. It adds trend
-  # bases only to a local copy so the Stage 2 covariate artefact stays unchanged.
+  # Verify the bundled primary reference before fitting alternatives.
   stage4_manifest_path <- file.path(stage4_dir, "stage4_snapshot_manifest.csv")
   if (!file.exists(stage4_manifest_path)) {
     stop("Stage 5.1 requires a completed Stage 4 snapshot.")
@@ -35,6 +37,7 @@ run_trend_sensitivity <- function(state) {
   )
   if (!stage4_intact) stop("The sealed Stage 4 authority failed verification.")
 
+  # Add alternative trend bases to a copy of the primary covariate frame.
   covar_trend <- copy(covar)
   covar_trend[, trend_linear := t]
   trend4 <- splines::ns(covar_trend$t, df = 4)
@@ -49,6 +52,7 @@ run_trend_sensitivity <- function(state) {
     sin12 + cos12 + sin6 + cos6 + offset(off)
   f_spline4_red <- items ~ trend4_1 + trend4_2 + trend4_3 + trend4_4 + offset(off)
 
+  # Standardise primary and alternative fits for direct row-wise comparison.
   standardise_primary_class <- screen_class |>
     transmute(
       bnf_class_code, bnf_class_name,
@@ -74,6 +78,7 @@ run_trend_sensitivity <- function(state) {
       theta, b_sin12, b_cos12, b_sin6, b_cos6, converged, note
     )
 
+  # Fit one trend specification and apply BH within the stated family.
   fit_trend_screen <- function(monthly, id_cols, f_full, f_red,
                                analysis_specification, trend_specification,
                                multiplicity_family) {
@@ -145,6 +150,7 @@ run_trend_sensitivity <- function(state) {
   ) |>
     arrange(analysis_specification, seasonality_q_bh, bnf_drug_code)
 
+  # Recalculate amplitude and STL strength for discoveries under each trend.
   characterise_trend_level <- function(scr, monthly, id_col, f_full) {
     detected <- scr |> filter(seasonality_detected)
     if (!nrow(detected)) return(tibble())
@@ -245,6 +251,7 @@ run_trend_sensitivity <- function(state) {
   ) |>
     arrange(analysis_specification, desc(meaningful), desc(peak_trough_ratio))
 
+  # Summarise discovery and meaningful-classification counts by specification.
   summarise_trend <- function(scr, chr, level) {
     detected_summary <- scr |>
       group_by(analysis_specification, trend_specification) |>
@@ -267,6 +274,7 @@ run_trend_sensitivity <- function(state) {
     summarise_trend(trend_screen_drug, trend_char_drug, "drug")
   ))
 
+  # Quantify set overlap between each alternative and the primary specification.
   compare_trend_sets <- function(scr, chr, id_col, level) {
     primary_discovery <- as.character(scr |>
       filter(analysis_specification == "trend_spline3", seasonality_detected) |>
@@ -309,6 +317,7 @@ run_trend_sensitivity <- function(state) {
                        "bnf_drug_code", "drug")
   )
 
+  # List series whose discovery or meaningful status changes.
   make_trend_changes <- function(scr, chr, id_col, name_col, level) {
     characterised <- chr |>
       select(all_of(id_col), analysis_specification,
@@ -461,6 +470,7 @@ run_trend_sensitivity <- function(state) {
     "all overlap/add/loss counts reconcile to both compared sets", "checked"
   )
 
+  # Fail before sealing outputs if any structural or reconciliation check fails.
   trend_qc_summary <- rbindlist(trend_checks, use.names = TRUE, fill = TRUE)
   atomic_fwrite(trend_qc_summary, file.path(trend_dir, "stage5_trend_qc_summary.csv"))
   if (any(!trend_qc_summary$pass)) {
@@ -504,7 +514,9 @@ run_trend_sensitivity <- function(state) {
 }
 
 
+## 03.2 Uniform Poisson-HAC sensitivity --------------------------------------
 run_hac_sensitivity <- function(state) {
+  # Apply the HAC route to every eligible series, regardless of diagnostics.
   evalq({
   hac_dir <- file.path(out_dir, "qc", "stage5", "uniform_hac")
   hac_snapshot_dir <- file.path(hac_dir, "uniform_hac_snapshot")
@@ -514,6 +526,7 @@ run_hac_sensitivity <- function(state) {
   trend_snapshot_dir <- file.path(trend_dir, "trend_snapshot")
   dir.create(hac_snapshot_dir, recursive = TRUE, showWarnings = FALSE)
 
+  # Collect integrity and reconciliation checks for this route.
   hac_checks <- list()
   add_hac_check <- function(check_id, pass, expected, observed, details = "") {
     hac_checks[[length(hac_checks) + 1L]] <<- data.table(
@@ -521,6 +534,7 @@ run_hac_sensitivity <- function(state) {
       observed = as.character(observed), details = as.character(details)
     )
   }
+  # Hash and size checks prevent stale upstream snapshots from being combined.
   verify_snapshot <- function(manifest_path, snapshot_path) {
     if (!file.exists(manifest_path)) return(list(ok = FALSE, n = 0L, matching = 0L))
     manifest <- fread(manifest_path)
@@ -552,6 +566,7 @@ run_hac_sensitivity <- function(state) {
     stop("Stage 5.2 requires intact Stage 4 and Stage 5.1 snapshots.")
   }
 
+  # Fit one Poisson model and test all harmonics with Newey–West covariance.
   fit_uniform_hac <- function(series, covar) {
     res <- data.frame(
       p_value = NA_real_, distribution = "poisson",
@@ -594,6 +609,7 @@ run_hac_sensitivity <- function(state) {
     res
   }
 
+  # Apply the uniform-HAC fit across one complete analysis family.
   fit_uniform_level <- function(monthly, id_cols, multiplicity_family) {
     monthly |>
       select(all_of(c(id_cols, "year_month", "items"))) |>
@@ -657,6 +673,7 @@ run_hac_sensitivity <- function(state) {
   hac_screen_drug <- bind_rows(primary_hac_drug, uniform_drug) |>
     arrange(analysis_specification, seasonality_q_bh, bnf_drug_code)
 
+  # Characterise every discovery from the uniform-HAC analysis.
   characterise_uniform_level <- function(scr, monthly, id_col) {
     detected <- scr |> filter(seasonality_detected)
     if (!nrow(detected)) return(tibble())
@@ -743,6 +760,7 @@ run_hac_sensitivity <- function(state) {
   ) |>
     arrange(analysis_specification, desc(meaningful), desc(peak_trough_ratio))
 
+  # Summarise and compare the uniform-HAC results with the primary route.
   summarise_hac <- function(scr, chr, level) {
     screen_summary <- scr |>
       group_by(analysis_specification, inference_specification) |>
@@ -764,6 +782,7 @@ run_hac_sensitivity <- function(state) {
     summarise_hac(hac_screen_drug, hac_char_drug, "drug")
   ))
 
+  # Measure discovery and meaningful-set overlap with the primary route.
   compare_hac_sets <- function(scr, chr, id_col, level) {
     primary_discovery_codes <- as.character(scr |>
       filter(analysis_specification == "primary_routed", seasonality_detected) |>
@@ -810,6 +829,7 @@ run_hac_sensitivity <- function(state) {
                      "bnf_drug_code", "drug")
   )
 
+  # List series whose classification differs under uniform HAC.
   make_hac_changes <- function(scr, chr, id_col, name_col, level) {
     characterised <- chr |>
       select(all_of(id_col), analysis_specification,
@@ -984,6 +1004,7 @@ run_hac_sensitivity <- function(state) {
             nrow(hac_overlap_summary), nrow(hac_q_boundary))
   )
 
+  # Seal only a complete, internally reconciled sensitivity result.
   hac_qc_summary <- rbindlist(hac_checks, use.names = TRUE, fill = TRUE)
   atomic_fwrite(hac_qc_summary, file.path(hac_dir, "stage5_hac_qc_summary.csv"))
   if (any(!hac_qc_summary$pass)) {
@@ -1027,12 +1048,15 @@ run_hac_sensitivity <- function(state) {
 }
 
 
+## 03.3 Working-day offset sensitivity ---------------------------------------
 run_working_days_sensitivity <- function(state) {
+  # Replace calendar exposure with registered-patient working days.
   evalq({
   working_dir <- file.path(out_dir, "qc", "stage5", "working_days")
   working_snapshot_dir <- file.path(working_dir, "working_days_snapshot")
   dir.create(working_snapshot_dir, recursive = TRUE, showWarnings = FALSE)
 
+  # Collect integrity and reconciliation checks for this route.
   working_checks <- list()
   add_working_check <- function(check_id, pass, expected, observed, details = "") {
     working_checks[[length(working_checks) + 1L]] <<- data.table(
@@ -1040,6 +1064,7 @@ run_working_days_sensitivity <- function(state) {
       observed = as.character(observed), details = as.character(details)
     )
   }
+  # Require intact primary, trend, and HAC references before continuing.
   verify_prior_snapshot <- function(manifest_path, snapshot_path) {
     if (!file.exists(manifest_path)) return(c(ok = FALSE, n = 0, matching = 0))
     manifest <- fread(manifest_path)
@@ -1075,6 +1100,7 @@ run_working_days_sensitivity <- function(state) {
   )
   if (!prior_ok) stop("Stage 5.3 requires intact prior-stage snapshots.")
 
+  # Refit the routed primary model with the working-day offset.
   fit_working_level <- function(monthly, id_cols, multiplicity_family) {
     monthly |>
       select(all_of(c(id_cols, "year_month", "items"))) |>
@@ -1141,6 +1167,7 @@ run_working_days_sensitivity <- function(state) {
   working_screen_drug <- bind_rows(primary_working_drug, working_drug) |>
     arrange(analysis_specification, seasonality_q_bh, bnf_drug_code)
 
+  # Recalculate seasonal characteristics using the alternative exposure.
   characterise_working_level <- function(scr, monthly, id_col) {
     detected <- scr |> filter(seasonality_detected)
     if (!nrow(detected)) return(tibble())
@@ -1240,6 +1267,7 @@ run_working_days_sensitivity <- function(state) {
   ) |>
     arrange(analysis_specification, desc(meaningful), desc(peak_trough_ratio))
 
+  # Summarise discoveries and meaningful series under each offset.
   summarise_working <- function(scr, chr, level) {
     scr |>
       group_by(analysis_specification, offset_specification) |>
@@ -1261,6 +1289,7 @@ run_working_days_sensitivity <- function(state) {
     summarise_working(working_screen_drug, working_char_drug, "drug")
   ))
 
+  # Measure set overlap between calendar-day and working-day offsets.
   compare_working_sets <- function(scr, chr, id_col, level) {
     primary_discovery_codes <- as.character(scr |>
       filter(analysis_specification == "primary_calendar_day_offset",
@@ -1309,6 +1338,7 @@ run_working_days_sensitivity <- function(state) {
                          "bnf_drug_code", "drug")
   )
 
+  # List series whose classification changes with the working-day offset.
   make_working_changes <- function(scr, chr, id_col, name_col, level) {
     characterised <- chr |>
       select(all_of(id_col), analysis_specification,
@@ -1494,6 +1524,7 @@ run_working_days_sensitivity <- function(state) {
             nrow(working_overlap_summary), nrow(working_q_boundary))
   )
 
+  # Check completeness and agreement before writing the sealed snapshot.
   working_qc_summary <- rbindlist(working_checks, use.names = TRUE, fill = TRUE)
   atomic_fwrite(working_qc_summary,
                 file.path(working_dir, "stage5_working_days_qc_summary.csv"))
@@ -1546,12 +1577,15 @@ run_working_days_sensitivity <- function(state) {
 }
 
 
+## 03.4 STL-strength threshold sensitivity -----------------------------------
 run_threshold_sensitivity <- function(state) {
+  # Reclassify fixed primary results at STL thresholds 0.40, 0.50, and 0.60.
   evalq({
   threshold_dir <- file.path(out_dir, "qc", "stage5", "threshold")
   threshold_snapshot_dir <- file.path(threshold_dir, "threshold_snapshot")
   dir.create(threshold_snapshot_dir, recursive = TRUE, showWarnings = FALSE)
 
+  # Collect integrity, nesting, and reconciliation checks.
   threshold_checks <- list()
   add_threshold_check <- function(check_id, pass, expected, observed, details = "") {
     threshold_checks[[length(threshold_checks) + 1L]] <<- data.table(
@@ -1559,6 +1593,7 @@ run_threshold_sensitivity <- function(state) {
       observed = as.character(observed), details = as.character(details)
     )
   }
+  # This post-processing analysis requires every earlier sealed reference.
   verify_threshold_prior <- function(manifest_path, snapshot_path) {
     if (!file.exists(manifest_path)) {
       return(list(ok = FALSE, n = 0L, matching = 0L))
@@ -1609,9 +1644,7 @@ run_threshold_sensitivity <- function(state) {
     stop("Stage 5.4 requires intact Stage 4 and Stage 5.1--5.3 snapshots.")
   }
 
-  # Stage 5.4 is deliberately post-processing only. It reads the sealed Stage 4
-  # characterisations and changes the descriptive STL-strength threshold; the
-  # discovery families, amplitude rule and primary 0.50 threshold stay fixed.
+  # Read fixed primary characterisations; models and discovery families do not change.
   stage4_snapshot_dir <- prior_specs$stage4[[2]]
   stage4_char_class <- fread(
     file.path(stage4_snapshot_dir, "characterisation_class.csv"),
@@ -1648,6 +1681,7 @@ run_threshold_sensitivity <- function(state) {
     seasonality_detected = drug_significant
   )]
 
+  # Apply each candidate threshold to every detected class or drug.
   expand_thresholds <- function(source, level_name) {
     rbindlist(lapply(threshold_grid, function(cut) {
       data.table(
@@ -1702,6 +1736,7 @@ run_threshold_sensitivity <- function(state) {
   )
   setorder(threshold_summary, level, stl_strength_threshold)
 
+  # List changes relative to the prespecified primary threshold of 0.50.
   make_threshold_changes <- function(panel) {
     reference <- panel[abs(stl_strength_threshold - 0.50) < 1e-12, .(
       series_code, series_name, parent_class_significant,
@@ -1732,6 +1767,7 @@ run_threshold_sensitivity <- function(state) {
   setorder(threshold_classification_changes, level, alternative_stl_threshold,
            direction, series_code)
 
+  # Retain the closest series around each candidate threshold for review.
   make_threshold_boundary <- function(panel, n = 20L) {
     boundary <- panel[
       abs(stl_strength_threshold - 0.50) < 1e-12 & amplitude_qualified
@@ -1820,6 +1856,7 @@ run_threshold_sensitivity <- function(state) {
     "0.50 exactly reproduces 30 primary classes and 88 exploratory drugs",
     sprintf("%d classes; %d drugs", length(primary_class_codes), length(primary_drug_codes))
   )
+  # Higher STL cutoffs must form nested subsets of lower cutoffs.
   nested_sets <- function(panel) {
     s40 <- panel[abs(stl_strength_threshold - 0.40) < 1e-12 & meaningful, series_code]
     s50 <- panel[abs(stl_strength_threshold - 0.50) < 1e-12 & meaningful, series_code]
@@ -1866,6 +1903,7 @@ run_threshold_sensitivity <- function(state) {
                   threshold_summary$n_meaningful), collapse = "; ")
   )
 
+  # Count the exact classifications expected to change between cutoffs.
   expected_change_count <- function(panel) {
     reference <- panel[abs(stl_strength_threshold - 0.50) < 1e-12,
                        .(series_code, reference = meaningful)]
@@ -1920,6 +1958,7 @@ run_threshold_sensitivity <- function(state) {
     paste(length(output_files), "non-empty analytical files"),
     paste(sum(file.exists(file.path(threshold_dir, output_files))), "present")
   )
+  # Reconcile nested sets and expected boundary changes before sealing outputs.
   threshold_qc_summary <- rbindlist(threshold_checks)
   atomic_fwrite(
     threshold_qc_summary,
