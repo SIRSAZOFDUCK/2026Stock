@@ -6,7 +6,12 @@ The monthly prescribing archives and registered-patient files are **not distribu
 
 ## Repository contents
 
-- `analysis_main.R` — authoritative end-to-end R analysis.
+- `analysis_main.R` — short authoritative coordinator that validates the runtime and dispatches each analysis stage.
+- `R/02_import_qc.R` — frozen-source import, aggregation, recoding and Stage 2 quality control.
+- `R/03_primary_analysis.R` — eligibility, model fitting, characterisation and primary result tables.
+- `R/05_sensitivities.R` — the four prespecified trend, HAC, working-day and threshold sensitivity analyses.
+- `R/06_diagnostics.R` — targeted diagnostics, cohort flow and missingness accounting.
+- `R/07_reporting.R` — publication figures and the prespecified 2021 window diagnostics.
 - `verify_inputs.R` — verifies every acquired source against the frozen size and SHA-256 manifest before analysis.
 - `renv.lock`, `.Rprofile`, `renv/activate.R`, `renv/settings.json`, `DESCRIPTION` — the exact R 4.6.1 project environment.
 - `reproducibility/input_manifest.csv` — 82-source provenance record with publisher, period, canonical URL, licence, schema, expected filename, size and SHA-256.
@@ -16,9 +21,9 @@ The monthly prescribing archives and registered-patient files are **not distribu
 
 The allowlist-style `.gitignore` excludes everything else, including primary data, generated results, manuscripts, local package libraries and temporary files.
 
-### Release-only portability changes
+### Release-only implementation changes
 
-The released `analysis_main.R` is analytically identical to the accepted canonical script. Two infrastructure-only adjustments were made for independent use: the default source locations are the repository-relative `data/epd/` and `data/list_size/` directories rather than the researcher's mounted-drive paths, and SHA-256 recording accepts either `shasum` or `sha256sum`. Neither adjustment changes source selection, processing, models, inference, outputs or release gates.
+The accepted monolithic script was split into the modules above so that the live workflow can be reviewed and maintained by stage. The historical Stage 3 and Stage 4 transition runners and Word-export staging were removed from the public runner: the former are superseded by the bundled sealed Stage 4 reference and the latter is presentation-only. The default source locations are repository-relative `data/epd/` and `data/list_size/`, and SHA-256 recording accepts either `shasum` or `sha256sum`. These implementation changes do not alter source selection, processing, models, inference, scientific outputs or release gates. Each run records hashes for the coordinator and every module in `analysis_source_manifest.csv`.
 
 ## Study scope
 

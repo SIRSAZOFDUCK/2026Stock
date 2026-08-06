@@ -9,6 +9,7 @@
 !README.md
 !DESCRIPTION
 !analysis_main.R
+!R/*.R
 !verify_inputs.R
 !renv.lock
 
