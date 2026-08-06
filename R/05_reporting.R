@@ -12,8 +12,8 @@ theme_pub <- theme_bw(base_size = 11) +
 
 # Return observed and fitted rates per 1,000 registered patients for one series.
 .series_fit <- function(mon, id_col, id_val) {
-  ser <- mon |> filter(.data[[id_col]] == id_val) |> select(year_month, items)
-  d   <- covar |> left_join(ser, by = "year_month") |> arrange(t)
+  ser <- mon %>% filter(.data[[id_col]] == id_val) %>% select(year_month, items) # filter rows; select columns
+  d   <- covar %>% left_join(ser, by = "year_month") %>% arrange(t) # order rows; join matching rows
   d$off <- d$offset_log_patient_days
   fit <- suppressWarnings(glm(.f_full, poisson, data = d))
   tibble(month_date = d$month_date,
@@ -23,18 +23,18 @@ theme_pub <- theme_bw(base_size = 11) +
 
 ## 05.2 Main-text exemplar and seasonality-landscape figures -----------------
 
-exemplar_codes <- results_class |>
-  filter(meaningful, peak_trough_ratio < 10) |>
-  slice_head(n = 6) |> pull(bnf_class_code)
+exemplar_codes <- results_class %>%
+  filter(meaningful, peak_trough_ratio < 10) %>% # retain rows meeting these conditions
+  slice_head(n = 6) %>% pull(bnf_class_code) # retain the first requested rows
 
 if (length(exemplar_codes)) {
   ex_names <- setNames(char_class$bnf_class_name[match(exemplar_codes, char_class$bnf_class_code)],
                        exemplar_codes)
-  lvl <- results_class |> filter(bnf_class_code %in% exemplar_codes) |>
-    arrange(desc(peak_trough_ratio)) |> pull(bnf_class_name)
+  lvl <- results_class %>% filter(bnf_class_code %in% exemplar_codes) %>% # filter rows
+    arrange(desc(peak_trough_ratio)) %>% pull(bnf_class_name) # apply the stated row order
 
-  fit_df <- bind_rows(lapply(exemplar_codes, function(cd)
-    .series_fit(class_monthly_elig, "bnf_class_code", cd) |> mutate(class = ex_names[as.character(cd)])))
+  fit_df <- bind_rows(lapply(exemplar_codes, function(cd) # combine rows
+    .series_fit(class_monthly_elig, "bnf_class_code", cd) %>% mutate(class = ex_names[as.character(cd)]))) # derive columns
   fit_df$class <- factor(fit_df$class, levels = lvl)
 
   p1 <- ggplot(fit_df, aes(month_date)) +
@@ -46,8 +46,8 @@ if (length(exemplar_codes)) {
     theme_pub
   ggsave(file.path(fig_dir, "Figure2_exemplar_observed_fitted.png"), p1, width = 9, height = 8, dpi = 300)
 
-  shape_df <- char_class |> filter(bnf_class_code %in% exemplar_codes) |>
-    group_by(bnf_class_name) |>
+  shape_df <- char_class %>% filter(bnf_class_code %in% exemplar_codes) %>% # filter rows
+    group_by(bnf_class_name) %>% # define groups for the next step
     reframe(month = 1:12,
             factor = { s <- .seasonal_curve(b_sin12, b_cos12, b_sin6, b_cos6, 1:12); exp(s)/mean(exp(s)) })
   shape_df$bnf_class_name <- factor(shape_df$bnf_class_name, levels = lvl)
@@ -65,16 +65,16 @@ if (length(exemplar_codes)) {
 ## ---- MAIN TEXT figure: amplitude x peak-month landscape --------------------
 
 
-land <- results_class |>
-  filter(meaningful) |>
-  left_join(chap_class, by = "bnf_class_code") |>
-  mutate(peak_month = factor(peak_month, levels = month.abb),
+land <- results_class %>%
+  filter(meaningful) %>% # retain rows meeting these conditions
+  left_join(chap_class, by = "bnf_class_code") %>% # attach matching fields to the left table
+  mutate(peak_month = factor(peak_month, levels = month.abb), # derive or update the stated columns
          chapter = bnf_chapter_name)
 # visible ceiling: classes above y_cap are drawn as triangles pinned at the top
 # with their true ratio in the label, so the bulk of classes spread out below.
 y_cap <- 3
-land <- land |>
-  mutate(above  = peak_trough_ratio > y_cap,
+land <- land %>%
+  mutate(above  = peak_trough_ratio > y_cap, # derive or update the stated columns
          y_plot = pmin(peak_trough_ratio, y_cap),
          lab    = ifelse(above,
                          sprintf("%s (%.0f\u00d7)", bnf_class_name, peak_trough_ratio),
@@ -114,11 +114,11 @@ compare_codes <- na.omit(c(
   break2  = pick("Digestive aids"),
   trend1  = pick("Filaricides")))
 if (length(compare_codes) >= 2) {
-  cmp_df <- bind_rows(lapply(compare_codes, function(cd) {
+  cmp_df <- bind_rows(lapply(compare_codes, function(cd) { # combine rows
     nm <- results_class$bnf_class_name[results_class$bnf_class_code == cd][1]
     keep <- results_class$meaningful[results_class$bnf_class_code == cd][1]
-    .series_fit(class_monthly_elig, "bnf_class_code", cd) |>
-      mutate(class = sprintf("%s (%s)", nm, ifelse(keep, "retained", "excluded")))
+    .series_fit(class_monthly_elig, "bnf_class_code", cd) %>%
+      mutate(class = sprintf("%s (%s)", nm, ifelse(keep, "retained", "excluded"))) # derive or update the stated columns
   }))
   p4 <- ggplot(cmp_df, aes(month_date)) +
     geom_point(aes(y = observed), size = 0.9, colour = "grey45") +
@@ -260,13 +260,13 @@ render_all_series <- function(mon, id_col, name_col, chap_lookup, out_pdf,
   if (per_page != 16L || ncol != 4L) {
     stop("Paginated appendix PDFs use a fixed 4 x 4 layout (16 panels per page).")
   }
-  ids <- chap_lookup |> arrange(bnf_chapter_code) |>
-    left_join(distinct(mon, .data[[id_col]], .data[[name_col]]), by = id_col)
+  ids <- chap_lookup %>% arrange(bnf_chapter_code) %>% # order rows
+    left_join(distinct(mon, .data[[id_col]], .data[[name_col]]), by = id_col) # attach matching fields to the left table
   pdf(out_pdf, width = 11.7, height = 8.3)   # A4 landscape
   on.exit(dev.off())
   first_page <- TRUE
   for (ch in unique(ids$bnf_chapter_code)) {
-    chn <- ids |> filter(bnf_chapter_code == ch)
+    chn <- ids %>% filter(bnf_chapter_code == ch) # filter rows
     pages <- split(seq_len(nrow(chn)), ceiling(seq_len(nrow(chn)) / per_page))
     for (pi in seq_along(pages)) {
       rows <- chn[pages[[pi]], ]
@@ -281,9 +281,9 @@ render_all_series <- function(mon, id_col, name_col, chap_lookup, out_pdf,
       page_tier_map <- setNames(tier_map[nm], panel_label)
       page_tier_map <- page_tier_map[!vapply(page_tier_map, is.null, logical(1))]
 
-      dd <- bind_rows(lapply(seq_len(nrow(rows)), function(i) {
-        .series_fit(mon, id_col, rows[[id_col]][i]) |>
-          mutate(panel = rows$panel_label[i])
+      dd <- bind_rows(lapply(seq_len(nrow(rows)), function(i) { # combine rows
+        .series_fit(mon, id_col, rows[[id_col]][i]) %>%
+          mutate(panel = rows$panel_label[i]) # derive or update the stated columns
       }))
       dd$panel <- factor(dd$panel, levels = rows$panel_label)
       ptitle <- sprintf("Chapter %02d - %s  (page %d of %d)",
@@ -323,8 +323,8 @@ FILL_SIG_SHAPE  <- "#9ECAE1"; TXT_SIG_SHAPE  <- "grey15"   # pale blue
 
 # Convert one fitted harmonic curve to factors relative to its annual mean.
 .series_shape <- function(mon, id_col, id_val) {
-  ser <- mon |> filter(.data[[id_col]] == id_val) |> select(year_month, items)
-  d   <- covar |> left_join(ser, by = "year_month") |> arrange(t)
+  ser <- mon %>% filter(.data[[id_col]] == id_val) %>% select(year_month, items) # filter rows; select columns
+  d   <- covar %>% left_join(ser, by = "year_month") %>% arrange(t) # order rows; join matching rows
   d$off <- d$offset_log_patient_days
   fit <- suppressWarnings(glm(.f_full, poisson, data = d))
   b <- coef(fit)
@@ -348,22 +348,22 @@ render_all_shapes <- function(mon, id_col, name_col, chap_lookup, out_pdf,
   if (per_page != 16L || ncol != 4L) {
     stop("Paginated appendix PDFs use a fixed 4 x 4 layout (16 panels per page).")
   }
-  ids <- chap_lookup |> arrange(bnf_chapter_code) |>
-    left_join(distinct(mon, .data[[id_col]], .data[[name_col]]), by = id_col)
+  ids <- chap_lookup %>% arrange(bnf_chapter_code) %>% # order rows
+    left_join(distinct(mon, .data[[id_col]], .data[[name_col]]), by = id_col) # attach matching fields to the left table
   pdf(out_pdf, width = 11.7, height = 8.3)   # A4 landscape
   on.exit(dev.off())
   first_page <- TRUE
   for (ch in unique(ids$bnf_chapter_code)) {
-    chn <- ids |> filter(bnf_chapter_code == ch)
+    chn <- ids %>% filter(bnf_chapter_code == ch) # filter rows
     pages <- split(seq_len(nrow(chn)), ceiling(seq_len(nrow(chn)) / per_page))
     for (pi in seq_along(pages)) {
       rows <- chn[pages[[pi]], ]
       pl <- .page_labels(rows, name_col, id_col, tier_map)
       rows$panel_label <- pl$labels
 
-      dd <- bind_rows(lapply(seq_len(nrow(rows)), function(i) {
-        .series_shape(mon, id_col, rows[[id_col]][i]) |>
-          mutate(panel = rows$panel_label[i])
+      dd <- bind_rows(lapply(seq_len(nrow(rows)), function(i) { # combine rows
+        .series_shape(mon, id_col, rows[[id_col]][i]) %>%
+          mutate(panel = rows$panel_label[i]) # derive or update the stated columns
       }))
       dd$panel <- factor(dd$panel, levels = rows$panel_label)
       ptitle <- sprintf("Chapter %02d - %s  (page %d of %d) - fitted seasonal shape",
@@ -445,27 +445,31 @@ for (f in epd_2021) {
   code_col <- if ("BNF_CODE" %in% hdr) "BNF_CODE"
   else if ("BNF_PRESENTATION_CODE" %in% hdr) "BNF_PRESENTATION_CODE"
   else stop("no recognised presentation-code column in ", basename(f))
-  d <- read_epd_archive(f, select = c(code_col, "ITEMS"))
-  setnames(d, c(code_col, "ITEMS"), c("bnf_code", "items"))
+  d <- read_epd_archive(f, select = c(code_col, "ITEMS")) %>%
+    rename(bnf_code = all_of(code_col), items = ITEMS) %>% # standardise source fields
+    mutate(bnf_chapter_code = substr(bnf_code, 1, 2)) %>% # derive the chapter code
+    filter(!is.na(bnf_chapter_code), bnf_chapter_code %in% valid_chapters) %>% # retain chapters 01–14
+    mutate(bnf_class_code = substr(bnf_code, 1, 6)) # derive the class code
+  agg <- d %>%
+    group_by(bnf_class_code) %>%         # group national class records
+    summarise(items = sum(items), .groups = "drop") %>% # aggregate item counts
+    mutate(year_month = as.integer(ym)) %>% # attach the source month
+    select(year_month, bnf_class_code, items) # set the cache schema
 
-  d[, bnf_chapter_code := substr(bnf_code, 1, 2)]
-  d <- d[!is.na(bnf_chapter_code) & bnf_chapter_code %in% valid_chapters]
-  d[, bnf_class_code := substr(bnf_code, 1, 6)]
-  agg <- d[, .(items = sum(items)), by = bnf_class_code]
-  agg[, year_month := as.integer(ym)]
-
-  fwrite(agg[, .(year_month, bnf_class_code, items)], cache_f)
+  fwrite(agg, cache_f)
   rm(d, agg); gc()                                                # free before next file
 }
 
 cache_files <- list.files(cache_dir_2021,
                           pattern = "^data_byclass_2021_\\d{6}\\.csv$", full.names = TRUE)
-class_2021 <- rbindlist(lapply(cache_files, function(f) fread(
-  f, colClasses = list(character = c(
-    "bnf_chapter_code", "bnf_section_code", "bnf_class_code"
-  ))
-)), use.names = TRUE)
-n_months_2021 <- uniqueN(class_2021$year_month)
+class_2021 <- cache_files %>%
+  lapply(function(f) fread(
+    f, colClasses = list(character = c(
+      "bnf_chapter_code", "bnf_section_code", "bnf_class_code"
+    ))
+  )) %>%                               # read monthly class caches
+  bind_rows()                          # combine 2021 observations
+n_months_2021 <- n_distinct(class_2021$year_month)
 if (n_months_2021 < 12L)
   warning(sprintf("Only %d of 12 months of 2021 EPD are present.", n_months_2021))
 
@@ -473,29 +477,31 @@ if (n_months_2021 < 12L)
 
 ls_2021_files <- list_size_2021_files
 
-ls2021_totals <- rbindlist(lapply(ls_2021_files, function(f) {
+ls2021_totals <- ls_2021_files %>%
+  lapply(function(f) {
   ym <- str_extract(basename(f), "\\d{6}")
   d  <- fread(f, select = "NUMBER_OF_PATIENTS")
-  data.table(year_month = as.integer(ym), list_size = sum(d$NUMBER_OF_PATIENTS, na.rm = TRUE))
-}))
+  tibble(year_month = as.integer(ym), list_size = sum(d$NUMBER_OF_PATIENTS, na.rm = TRUE))
+  }) %>%                               # total each quarterly denominator file
+  bind_rows()                          # combine the 2021 observations
 
 # complete 2021 monthly grid, carry forward, back-fill any leading gap
-ls2021 <- data.table(date = seq(window_start, window_end, by = "month")) |>
-  mutate(year_month = as.integer(format(date, "%Y%m"))) |>
-  left_join(ls2021_totals, by = "year_month") |>
-  arrange(date) |>
-  tidyr::fill(list_size, .direction = "downup") |>
-  transmute(year_month, list_size)
+ls2021 <- tibble(date = seq(window_start, window_end, by = "month")) %>%
+  mutate(year_month = as.integer(format(date, "%Y%m"))) %>% # derive or update the stated columns
+  left_join(ls2021_totals, by = "year_month") %>% # attach matching fields to the left table
+  arrange(date) %>% # apply the stated row order
+  tidyr::fill(list_size, .direction = "downup") %>% # fill values in the stated direction
+  transmute(year_month, list_size) # derive and retain the stated columns
 
 # combine with the 2022-2025 denominator already used in the analysis (covar)
-ls_all <- bind_rows(ls2021, covar |> transmute(year_month, list_size)) |>
-  arrange(year_month)
+ls_all <- bind_rows(ls2021, covar %>% transmute(year_month, list_size)) %>% # derive columns; combine rows
+  arrange(year_month) # apply the stated row order
 
 ### 05.6c Select named seasonal exemplars and one flat control
 
-ex <- results_class |>
-  distinct(bnf_class_code, bnf_class_name) |>
-  filter(bnf_class_name %in% exemplar_names)
+ex <- results_class %>%
+  distinct(bnf_class_code, bnf_class_name) %>% # retain distinct rows
+  filter(bnf_class_name %in% exemplar_names) # retain rows meeting these conditions
 missing_names <- setdiff(exemplar_names, ex$bnf_class_name)
 if (length(missing_names))
   warning("exemplar class name(s) not found and skipped: ",
@@ -503,36 +509,36 @@ if (length(missing_names))
           " - check spelling against results_class$bnf_class_name.")
 
 # flat control: highest-volume eligible class that was NOT significant
-flat <- class_monthly_elig |>
-  filter(!bnf_class_code %in% results_class$bnf_class_code) |>
-  group_by(bnf_class_code, bnf_class_name) |>
-  summarise(items = sum(items), .groups = "drop") |>
-  arrange(desc(items)) |>
-  slice_head(n = 1) |>
-  select(bnf_class_code, bnf_class_name)
+flat <- class_monthly_elig %>%
+  filter(!bnf_class_code %in% results_class$bnf_class_code) %>% # retain rows meeting these conditions
+  group_by(bnf_class_code, bnf_class_name) %>% # define groups for the next step
+  summarise(items = sum(items), .groups = "drop") %>% # reduce groups to summary values
+  arrange(desc(items)) %>% # apply the stated row order
+  slice_head(n = 1) %>% # retain the first requested rows
+  select(bnf_class_code, bnf_class_name) # retain the stated columns
 
-exemplars <- bind_rows(ex, flat) |> distinct(bnf_class_code, bnf_class_name)
+exemplars <- bind_rows(ex, flat) %>% distinct(bnf_class_code, bnf_class_name) # combine rows; deduplicate rows
 if (nrow(exemplars) < 1L) stop("No exemplar classes resolved.")
 
 # facet order: named seasonal classes by amplitude (largest first), control last
-ex_ord <- ex |>
-  left_join(results_class |> select(bnf_class_code, peak_trough_ratio), by = "bnf_class_code") |>
-  arrange(desc(peak_trough_ratio))
+ex_ord <- ex %>%
+  left_join(results_class %>% select(bnf_class_code, peak_trough_ratio), by = "bnf_class_code") %>% # attach matching fields to the left table
+  arrange(desc(peak_trough_ratio)) # apply the stated row order
 facet_levels <- unique(c(ex_ord$bnf_class_name, flat$bnf_class_name))
 
 ### 05.6d Build and plot the 2021–2025 rate series
 
-items_all <- bind_rows(
-  class_2021    |> transmute(year_month, bnf_class_code = as.character(bnf_class_code), items),
-  class_monthly |> transmute(year_month, bnf_class_code = as.character(bnf_class_code), items))
+items_all <- bind_rows( # combine rows
+  class_2021    %>% transmute(year_month, bnf_class_code = as.character(bnf_class_code), items), # derive columns
+  class_monthly %>% transmute(year_month, bnf_class_code = as.character(bnf_class_code), items)) # derive columns
 
-plot_df <- exemplars |>
-  inner_join(items_all, by = "bnf_class_code") |>
-  left_join(ls_all, by = "year_month") |>
-  mutate(date = as.Date(paste0(year_month, "01"), "%Y%m%d"),
+plot_df <- exemplars %>%
+  inner_join(items_all, by = "bnf_class_code") %>% # retain matching rows from both tables
+  left_join(ls_all, by = "year_month") %>% # attach matching fields to the left table
+  mutate(date = as.Date(paste0(year_month, "01"), "%Y%m%d"), # derive or update the stated columns
          rate = items / list_size * 1000,
-         class = factor(bnf_class_name, levels = facet_levels)) |>
-  arrange(class, date)
+         class = factor(bnf_class_name, levels = facet_levels)) %>%
+  arrange(class, date) # apply the stated row order
 
 res_dir <- file.path(data_dir, "results")
 fig_dir <- file.path(res_dir, "figures")
@@ -565,7 +571,7 @@ p_win <- ggplot(plot_df, aes(date, rate)) +
 
 ggsave(file.path(fig_dir, "figure_window_justification_2021_2025.png"),
        p_win, width = 10, height = 8, dpi = 300)
-fwrite(plot_df |> select(bnf_class_code, bnf_class_name, year_month, items, list_size, rate),
+fwrite(plot_df %>% select(bnf_class_code, bnf_class_name, year_month, items, list_size, rate), # select columns
        file.path(res_dir, "tables", "window_justification_rates.csv"))
 
 cat(sprintf(paste0(
@@ -586,42 +592,60 @@ stopifnot(exists("ls_all"), exists("res_dir"))          # built in 05.6b / 05.6d
 if (!exists("class_2021")) {
   cf <- list.files(cache_dir_2021, pattern = "^data_byclass_2021_\\d{6}\\.csv$", full.names = TRUE)
   if (!length(cf)) stop("No 2021 class cache found; run subsection 05.6a first.")
-  class_2021 <- rbindlist(lapply(cf, function(f) fread(
-    f, colClasses = list(character = c(
-      "bnf_chapter_code", "bnf_section_code", "bnf_class_code"
-    ))
-  )), use.names = TRUE)
+  class_2021 <- cf %>%
+    lapply(function(f) fread(
+      f, colClasses = list(character = c(
+        "bnf_chapter_code", "bnf_section_code", "bnf_class_code"
+      ))
+    )) %>%                             # read available monthly caches
+    bind_rows()                        # reconstruct the 2021 class panel
 }
 if (!exists("class_monthly"))
   class_monthly <- readRDS(file.path(data_dir, "class_monthly.rds"))
 if (!exists("class_monthly_elig"))
   class_monthly_elig <- readRDS(file.path(data_dir, "class_monthly_eligible.rds"))
 
-cm  <- as.data.table(class_monthly)
-cme <- as.data.table(class_monthly_elig)
+cm  <- as_tibble(class_monthly)
+cme <- as_tibble(class_monthly_elig)
 elig_codes <- unique(cme$bnf_class_code)
-meta_lu <- unique(cm[, .(bnf_class_code, bnf_class_name, bnf_chapter_code, bnf_chapter_name)])
+meta_lu <- cm %>%
+  distinct(bnf_class_code, bnf_class_name, bnf_chapter_code, bnf_chapter_name) # create class metadata lookup
 
 # complete 2021-2025 monthly panel (eligible classes); 2021 gaps -> 0 items
-grid21 <- CJ(bnf_class_code = elig_codes, year_month = 202101:202112)
-it21 <- merge(grid21, class_2021[, .(bnf_class_code, year_month, items)],
-              by = c("bnf_class_code", "year_month"), all.x = TRUE)
-it21[is.na(items), items := 0]
-itrest <- cm[bnf_class_code %in% elig_codes, .(bnf_class_code, year_month, items)]
-panel <- rbind(it21, itrest)
-panel <- merge(panel, as.data.table(ls_all)[, .(year_month, list_size)], by = "year_month")
-panel[, `:=`(year = year_month %/% 100L, month = year_month %% 100L,
-             lr = log(items + 0.5) - log(list_size),
-             rate = items / list_size * 1000)]
-setorder(panel, bnf_class_code, year_month)
+grid21 <- tidyr::crossing(
+  bnf_class_code = elig_codes,
+  year_month = 202101:202112
+) # create every eligible class-month combination
+it21 <- grid21 %>%
+  left_join(                            # attach observed 2021 items
+    class_2021 %>% select(bnf_class_code, year_month, items), # select columns
+    by = c("bnf_class_code", "year_month")
+  ) %>%
+  mutate(items = coalesce(items, 0))    # encode absent sparse records as zero items
+itrest <- cm %>%
+  filter(bnf_class_code %in% elig_codes) %>% # retain eligible 2022–2025 classes
+  select(bnf_class_code, year_month, items) # retain panel fields
+panel <- bind_rows(it21, itrest) %>% # combine rows
+  inner_join(                           # attach monthly denominators
+    ls_all %>% as_tibble() %>% select(year_month, list_size), # select columns
+    by = "year_month"
+  ) %>%
+  mutate(                              # derive time, log-rate, and plotted rate
+    year = year_month %/% 100L,
+    month = year_month %% 100L,
+    lr = log(items + 0.5) - log(list_size),
+    rate = items / list_size * 1000
+  ) %>%
+  arrange(bnf_class_code, year_month)   # order each class chronologically
 
 # Map YYYYMM to a continuous month index beginning at January 2022.
 idx <- function(ym) (ym %/% 100L - 2022L) * 12L + (ym %% 100L)
 
 # Compare 2021 level and within-year shape with the 2022–2025 reference pattern.
 scan_one <- function(d) {
-  d <- d[order(year_month)]
-  rest <- d[year >= 2022]; y21 <- d[year == 2021]
+  d <- d %>% arrange(year_month)        # order one class chronologically
+  rest <- d %>% filter(year >= 2022)    # define the reference window
+  y21 <- d %>% filter(year == 2021)     # isolate the excluded year
   if (nrow(rest) < 24 || nrow(y21) < 6) return(NULL)
   rt <- idx(rest$year_month); yt <- idx(y21$year_month)
   fit <- lm(lr ~ rt, data = data.frame(lr = rest$lr, rt = rt))
@@ -630,23 +654,28 @@ scan_one <- function(d) {
   lev_log <- mean(y21$lr) - mean(pred21)
   prof <- function(sub){ v <- sub$lr[order(sub$month)]; if (length(v) != 12) return(rep(NA, 12)); v - mean(v) }
   ry <- 2022:2025
-  P   <- sapply(ry, function(y) prof(d[year == y]))
+  P <- sapply(ry, function(y) prof(d %>% filter(year == y))) # filter rows
   ref <- rowMeans(P)
   scor <- suppressWarnings(stats::cor(prof(y21), ref))
   bcor <- mean(sapply(seq_along(ry), function(i) suppressWarnings(stats::cor(P[, i], ref))))
-  data.table(level_dev_pct = 100 * (exp(lev_log) - 1),
+  tibble(level_dev_pct = 100 * (exp(lev_log) - 1),
              anomaly_sd    = if (rsd > 0) lev_log / rsd else NA_real_,
              shape_cor_21  = scor, base_shape_cor = bcor,
              shape_gap     = bcor - scor)
 }
 
-scan <- panel[, scan_one(.SD), by = bnf_class_code]
-scan <- merge(scan, meta_lu, by = "bnf_class_code")
-scan[, direction   := fifelse(level_dev_pct < 0, "2021 lower", "2021 higher")]
-scan[, flag_level  := !is.na(anomaly_sd) & abs(anomaly_sd) >= 2]
-scan[, flag_shape  := !is.na(shape_gap)  & shape_gap >= 0.30]
-scan[, flagged     := flag_level | flag_shape]
-setorder(scan, level_dev_pct)
+scan <- panel %>%
+  group_by(bnf_class_code) %>%           # analyse each eligible class
+  group_modify(~ scan_one(.x)) %>%       # calculate 2021 level and shape diagnostics
+  ungroup() %>%                          # return to one class-level table
+  inner_join(meta_lu, by = "bnf_class_code") %>% # attach class metadata
+  mutate(                               # classify the observed departures
+    direction = if_else(level_dev_pct < 0, "2021 lower", "2021 higher"),
+    flag_level = !is.na(anomaly_sd) & abs(anomaly_sd) >= 2,
+    flag_shape = !is.na(shape_gap) & shape_gap >= 0.30,
+    flagged = flag_level | flag_shape
+  ) %>%
+  arrange(level_dev_pct)                # order from lowest to highest departure
 fwrite(scan, file.path(res_dir, "tables", "window_2021_anomaly_scan.csv"))
 
 #### Summarise level and shape flags
@@ -656,24 +685,35 @@ cat(sprintf("    of which 2021 lower: %d | 2021 higher: %d\n",
             sum(scan$flagged & scan$level_dev_pct < 0),
             sum(scan$flagged & scan$level_dev_pct >= 0)))
 cat("  flagged by BNF chapter:\n")
-print(scan[flagged == TRUE, .N, by = bnf_chapter_name][order(-N)])
+print(scan %>% filter(flagged) %>% count(bnf_chapter_name, sort = TRUE)) # filter rows; count groups
 cat("\n  Most-below-trend classes (2021 vs 2022-2025):\n")
-print(scan[order(level_dev_pct)][1:12,
-                                 .(bnf_class_name, level_dev_pct = round(level_dev_pct, 0),
-                                   anomaly_sd = round(anomaly_sd, 1), shape_gap = round(shape_gap, 2))])
+print(scan %>%
+        arrange(level_dev_pct) %>%       # rank lowest level departures
+        slice_head(n = 12) %>%           # retain the twelve extremes
+        transmute(bnf_class_name, level_dev_pct = round(level_dev_pct, 0), # derive and retain the stated columns
+                  anomaly_sd = round(anomaly_sd, 1), shape_gap = round(shape_gap, 2)))
 cat("\n  Most shape-disrupted classes:\n")
-print(scan[order(-shape_gap)][1:12,
-                              .(bnf_class_name, shape_gap = round(shape_gap, 2),
-                                level_dev_pct = round(level_dev_pct, 0))])
+print(scan %>%
+        arrange(desc(shape_gap)) %>%      # rank largest shape gaps
+        slice_head(n = 12) %>%           # retain the twelve extremes
+        transmute(bnf_class_name, shape_gap = round(shape_gap, 2), # derive and retain the stated columns
+                  level_dev_pct = round(level_dev_pct, 0)))
 
 #### Plot the nine largest absolute 2021 level departures
-sel <- scan[order(-abs(level_dev_pct))][1:9]
+sel <- scan %>%
+  arrange(desc(abs(level_dev_pct))) %>%  # rank absolute level departures
+  slice_head(n = 9)                     # retain plotting exemplars
 lab <- setNames(sprintf("%s (2021 %+.0f%%)", sel$bnf_class_name, sel$level_dev_pct),
                 sel$bnf_class_code)
-pd  <- panel[bnf_class_code %in% sel$bnf_class_code]
-pd[, date  := as.Date(paste0(year_month, "01"), "%Y%m%d")]
-pd[, class := factor(lab[as.character(bnf_class_code)],
-                     levels = lab[as.character(sel$bnf_class_code)])]
+pd <- panel %>%
+  filter(bnf_class_code %in% sel$bnf_class_code) %>% # retain selected classes
+  mutate(                              # derive plot date and ordered label
+    date = as.Date(paste0(year_month, "01"), "%Y%m%d"),
+    class = factor(
+      lab[as.character(bnf_class_code)],
+      levels = lab[as.character(sel$bnf_class_code)]
+    )
+  )
 
 p_scan <- ggplot(pd, aes(date, rate)) +
   annotate("rect", xmin = as.Date("2020-12-16"), xmax = as.Date("2021-12-16"),
@@ -743,19 +783,28 @@ FILL_LEVEL <- "#B2182B"; TXT_LEVEL <- "white"    # level-disrupted (strongest si
 FILL_SHAPE <- "#2166AC"; TXT_SHAPE <- "white"    # shape-disrupted only
 FILL_NONE  <- "grey92";  TXT_NONE  <- "grey15"   # not flagged
 
-pd <- copy(panel)
-pd[, date := as.Date(paste0(year_month, "01"), "%Y%m%d")]
-pd[, rate := items / list_size * 1000]
+pd <- panel %>%
+  mutate(                              # derive plotting fields
+    date = as.Date(paste0(year_month, "01"), "%Y%m%d"),
+    rate = items / list_size * 1000
+  )
 
 # panel label per class: name + signed 2021 level deviation (disambiguate any
 # duplicate names by appending the code, so facet levels stay unique per page)
-sc <- as.data.table(scan)[, .(bnf_class_code, bnf_class_name, bnf_chapter_code,
-                              bnf_chapter_name, level_dev_pct, flag_level, flag_shape)]
-sc[, base_label := sprintf("%s (2021 %+.0f%%)", bnf_class_name, round(level_dev_pct))]
-sc[, tier := fifelse(flag_level, "level", fifelse(flag_shape, "shape", "none"))]
+sc <- scan %>%
+  select(                               # retain class labels and disruption flags
+    bnf_class_code, bnf_class_name, bnf_chapter_code,
+    bnf_chapter_name, level_dev_pct, flag_level, flag_shape
+  ) %>%
+  mutate(                               # construct labels and colour tiers
+    base_label = sprintf("%s (2021 %+.0f%%)", bnf_class_name, round(level_dev_pct)),
+    tier = case_when(flag_level ~ "level", flag_shape ~ "shape", TRUE ~ "none")
+  )
 
 # Put the largest absolute departures first within each chapter.
-order_key <- function(dt) dt[order(bnf_chapter_code, -abs(level_dev_pct))]
+order_key <- function(data) {
+  data %>% arrange(bnf_chapter_code, desc(abs(level_dev_pct))) # rank within chapter
+}
 sc <- order_key(sc)
 
 out_pdf <- file.path(res_dir, "figures", "S1. figure_window_all_classes_2021_2025.pdf")
@@ -770,15 +819,16 @@ if (!exists("theme_pub")) {
 pdf(out_pdf, width = 11.7, height = 8.3)   # A4 landscape
 first_page <- TRUE
 for (ch in unique(sc$bnf_chapter_code)) {
-  chn <- sc[bnf_chapter_code == ch]
+  chn <- sc %>% filter(bnf_chapter_code == ch) # isolate one chapter
   pages <- split(seq_len(nrow(chn)), ceiling(seq_len(nrow(chn)) / per_page))
   for (pi in seq_along(pages)) {
-    rows <- chn[pages[[pi]]]
+    rows <- chn %>% slice(pages[[pi]])  # isolate one output page
     # unique facet labels on this page
     lab <- rows$base_label
     dup <- lab %in% lab[duplicated(lab)]
     lab <- ifelse(dup, sprintf("%s [%s]", lab, rows$bnf_class_code), lab)
-    rows[, panel_label := lab]
+    rows <- rows %>%
+      mutate(panel_label = lab)         # attach unique facet labels
 
     tier_map <- setNames(
       lapply(rows$tier, function(t)
@@ -787,9 +837,13 @@ for (ch in unique(sc$bnf_chapter_code)) {
                c(FILL_NONE,  TXT_NONE))),
       rows$panel_label)
 
-    dd <- merge(pd[bnf_class_code %in% rows$bnf_class_code],
-                rows[, .(bnf_class_code, panel_label)], by = "bnf_class_code")
-    dd[, panel := factor(panel_label, levels = rows$panel_label)]
+    dd <- pd %>%
+      filter(bnf_class_code %in% rows$bnf_class_code) %>% # retain page classes
+      inner_join(                          # attach page-specific labels
+        rows %>% select(bnf_class_code, panel_label), # select columns
+        by = "bnf_class_code"
+      ) %>%
+      mutate(panel = factor(panel_label, levels = rows$panel_label)) # fix facet order
 
     ptitle <- sprintf("Chapter %02d - %s  (page %d of %d)  |  red = 2021 level-disrupted, blue = shape-disrupted",
                       as.integer(ch), rows$bnf_chapter_name[1], pi, length(pages))

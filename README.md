@@ -19,6 +19,8 @@ The monthly prescribing archives and registered-patient files are **not distribu
 - `reproducibility/source_snapshots/bank-holidays_2026-08-05.json` — the dated GOV.UK England-and-Wales bank-holiday snapshot used for the working-day sensitivity.
 - `Outputs/canonical/qc/stage4/stage4_snapshot*` — a small sealed numerical reference used only to verify that the primary class and all-eligible-drug analysis is unchanged before the sensitivity stages run. It is not primary data.
 
+All table transformations use `dplyr` syntax and the `%>%` pipe. Short inline comments describe each pipeline step; `data.table` is retained only for high-volume CSV/ZIP input and output.
+
 The allowlist-style `.gitignore` excludes everything else, including primary data, generated results, manuscripts, local package libraries and temporary files.
 
 ### Release-only implementation changes
@@ -106,7 +108,7 @@ Do not update packages before reproduction. A changed R version or lockfile defi
 If the data use the default `data/epd/` and `data/list_size/` locations:
 
 ```sh
-Rscript --vanilla verify_inputs.R
+Rscript verify_inputs.R
 ```
 
 For data stored elsewhere:
@@ -114,7 +116,7 @@ For data stored elsewhere:
 ```sh
 STOCK2026_EPD_DIR="/path/to/EPD" \
 STOCK2026_LIST_SIZE_DIR="/path/to/GP_ListSize" \
-Rscript --vanilla verify_inputs.R
+Rscript verify_inputs.R
 ```
 
 The verifier checks all 82 required files, including the bundled BNF and calendar snapshots. It hashes only files whose byte size first matches the manifest. Do not start the expensive analysis if verification fails.
@@ -122,7 +124,7 @@ The verifier checks all 82 required files, including the bundled BNF and calenda
 To check only the two bundled version-specific reference inputs while reviewing the repository:
 
 ```sh
-Rscript --vanilla verify_inputs.R --bundled-only
+Rscript verify_inputs.R --bundled-only
 ```
 
 ## Check setup without importing data

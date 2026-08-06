@@ -183,7 +183,7 @@ archive_executable <- Sys.which("bsdtar")
 if (!nzchar(archive_executable)) {
   stop("The system 'bsdtar' executable is required to read the ZIP 6.3-compressed frozen EPD archives.")
 }
-# Stream an EPD archive directly into data.table without extracting it to disk.
+# Stream an EPD archive into memory without extracting it to disk.
 read_epd_archive <- function(path, select = NULL, nrows = Inf, colClasses = NULL) {
   data.table::fread(
     cmd = paste(shQuote(archive_executable), "-xOf", shQuote(path)),

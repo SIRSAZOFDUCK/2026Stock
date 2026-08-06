@@ -3,6 +3,8 @@
 # Verify that independently acquired source files match the frozen study
 # manifest before starting the expensive import and modelling workflow.
 
+suppressPackageStartupMessages(library(dplyr))
+
 script_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
 repo_dir <- if (length(script_arg) == 1L) {
   dirname(normalizePath(sub("^--file=", "", script_arg), mustWork = TRUE))
@@ -22,7 +24,8 @@ if (length(missing_columns)) {
 
 bundled_only <- "--bundled-only" %in% commandArgs(trailingOnly = TRUE)
 if (bundled_only) {
-  manifest <- manifest[grepl("^(BNF_REFERENCE|BANK_HOLIDAYS)", manifest$source_id), , drop = FALSE]
+  manifest <- manifest %>%
+    filter(grepl("^(BNF_REFERENCE|BANK_HOLIDAYS)", source_id)) # retain bundled references
 }
 
 epd_dir <- Sys.getenv(
@@ -86,7 +89,7 @@ for (index in which(size_matches)) {
 }
 hash_matches <- size_matches & observed_hash == manifest$sha256
 
-verification <- data.frame(
+verification <- tibble(
   source_id = manifest$source_id,
   path = paths,
   exists = exists,
@@ -95,16 +98,18 @@ verification <- data.frame(
   size_matches = size_matches,
   expected_sha256 = manifest$sha256,
   observed_sha256 = observed_hash,
-  sha256_matches = hash_matches,
-  stringsAsFactors = FALSE
+  sha256_matches = hash_matches
 )
 
-failed <- verification[!verification$sha256_matches, , drop = FALSE]
+failed <- verification %>%
+  filter(!sha256_matches)                # retain missing or altered sources
 if (nrow(failed)) {
-  print(failed[, c(
-    "source_id", "path", "exists", "expected_size_bytes",
-    "observed_size_bytes", "size_matches", "sha256_matches"
-  )], row.names = FALSE)
+  failed %>%
+    select(                               # show fields needed to diagnose failures
+      source_id, path, exists, expected_size_bytes,
+      observed_size_bytes, size_matches, sha256_matches
+    ) %>%
+    print(n = Inf)
   stop(
     nrow(failed), " of ", nrow(verification),
     " required sources are missing or differ from the frozen manifest."

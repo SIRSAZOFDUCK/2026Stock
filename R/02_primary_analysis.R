@@ -16,44 +16,44 @@ min_items_yr <- eligibility_min_items_year
 
 ### Class eligibility
 
-elig_class <- class_monthly |>
-  group_by(bnf_class_code, bnf_class_name) |>
-  summarise(n_months = n_distinct(year_month), total_items = sum(items), .groups = "drop") |>
-  left_join(
-    class_monthly |>
-      group_by(bnf_class_code, year = year_month %/% 100L) |>
-      summarise(items_yr = sum(items), .groups = "drop") |>
-      group_by(bnf_class_code) |>
-      summarise(n_years = n(), min_year_items = min(items_yr), .groups = "drop"),
-    by = "bnf_class_code") |>
-  mutate(rule_every_month = n_months == n_months_req,
+elig_class <- class_monthly %>%
+  group_by(bnf_class_code, bnf_class_name) %>% # define groups for the next step
+  summarise(n_months = n_distinct(year_month), total_items = sum(items), .groups = "drop") %>% # reduce groups to summary values
+  left_join( # attach matching fields to the left table
+    class_monthly %>%
+      group_by(bnf_class_code, year = year_month %/% 100L) %>% # define groups for the next step
+      summarise(items_yr = sum(items), .groups = "drop") %>% # reduce groups to summary values
+      group_by(bnf_class_code) %>% # define groups for the next step
+      summarise(n_years = n(), min_year_items = min(items_yr), .groups = "drop"), # reduce groups to summary values
+    by = "bnf_class_code") %>%
+  mutate(rule_every_month = n_months == n_months_req, # derive or update the stated columns
          rule_min_volume  = n_years == n_years_req & min_year_items >= min_items_yr,
          eligible         = rule_every_month & rule_min_volume)
 
 
 # Drug eligibility is keyed by code; the latest observed labels supply metadata.
 
-drug_meta <- drug_monthly |>
-  group_by(bnf_drug_code) |>
-  summarise(bnf_class_code = bnf_class_code[which.max(year_month)],
+drug_meta <- drug_monthly %>%
+  group_by(bnf_drug_code) %>% # define groups for the next step
+  summarise(bnf_class_code = bnf_class_code[which.max(year_month)], # reduce groups to summary values
             bnf_class_name = bnf_class_name[which.max(year_month)],
             bnf_drug_name  = bnf_drug_name[which.max(year_month)],
             .groups = "drop")
 
-elig_drug <- drug_meta |>
-  left_join(
-    drug_monthly |>
-      group_by(bnf_drug_code) |>
-      summarise(n_months = n_distinct(year_month), total_items = sum(items), .groups = "drop"),
-    by = "bnf_drug_code") |>
-  left_join(
-    drug_monthly |>
-      group_by(bnf_drug_code, year = year_month %/% 100L) |>
-      summarise(items_yr = sum(items), .groups = "drop") |>
-      group_by(bnf_drug_code) |>
-      summarise(n_years = n(), min_year_items = min(items_yr), .groups = "drop"),
-    by = "bnf_drug_code") |>
-  mutate(rule_every_month = n_months == n_months_req,
+elig_drug <- drug_meta %>%
+  left_join( # attach matching fields to the left table
+    drug_monthly %>%
+      group_by(bnf_drug_code) %>% # define groups for the next step
+      summarise(n_months = n_distinct(year_month), total_items = sum(items), .groups = "drop"), # reduce groups to summary values
+    by = "bnf_drug_code") %>%
+  left_join( # attach matching fields to the left table
+    drug_monthly %>%
+      group_by(bnf_drug_code, year = year_month %/% 100L) %>% # define groups for the next step
+      summarise(items_yr = sum(items), .groups = "drop") %>% # reduce groups to summary values
+      group_by(bnf_drug_code) %>% # define groups for the next step
+      summarise(n_years = n(), min_year_items = min(items_yr), .groups = "drop"), # reduce groups to summary values
+    by = "bnf_drug_code") %>%
+  mutate(rule_every_month = n_months == n_months_req, # derive or update the stated columns
          rule_min_volume  = n_years == n_years_req & min_year_items >= min_items_yr,
          eligible         = rule_every_month & rule_min_volume)
 
@@ -76,20 +76,20 @@ coverage_one <- function(tab, level_name) {
     excluded_item_share = sum(tab$total_items[!eligible_flag]) / sum(tab$total_items)
   )
 }
-coverage <- bind_rows(
+coverage <- bind_rows( # combine rows
   coverage_one(elig_class, "class"),
   coverage_one(elig_drug, "drug")
 )
 
 # Assign one readable reason to every excluded series.
 add_reason <- function(tab) {
-  tab |>
-    filter(!eligible) |>
-    mutate(reason = case_when(
+  tab %>%
+    filter(!eligible) %>% # retain rows meeting these conditions
+    mutate(reason = case_when( # derive or update the stated columns
       !rule_every_month & !rule_min_volume ~ "not every month; <1000 items/year",
       !rule_every_month                    ~ "not every month",
-      TRUE                                 ~ "<1000 items/year")) |>
-    arrange(desc(total_items))
+      TRUE                                 ~ "<1000 items/year")) %>%
+    arrange(desc(total_items)) # apply the stated row order
 }
 excl_class <- add_reason(elig_class)
 excl_drug  <- add_reason(elig_drug)
@@ -99,13 +99,13 @@ reason_breakdown <- function(excl, elig, level_name) {
   lvls <- c("<1000 items/year", "not every month", "not every month; <1000 items/year")
   n_total <- nrow(elig)
 
-  tab <- excl |>
-    count(reason, name = "n") |>
-    right_join(tibble(reason = lvls), by = "reason") |>   # keep empty categories, fix order
-    mutate(n = coalesce(n, 0L),
+  tab <- excl %>%
+    count(reason, name = "n") %>% # count the stated groups
+    right_join(tibble(reason = lvls), by = "reason") %>%   # keep empty categories, fix order
+    mutate(n = coalesce(n, 0L), # derive or update the stated columns
            pct_of_excluded = 100 * n / sum(n),
-           pct_of_all      = 100 * n / n_total) |>
-    transmute(reason, n,
+           pct_of_all      = 100 * n / n_total) %>%
+    transmute(reason, n, # derive and retain the stated columns
               pct_of_excluded = round(pct_of_excluded, 1),
               pct_of_all      = round(pct_of_all, 1))
 
@@ -120,11 +120,11 @@ excl_class_summary <- reason_breakdown(excl_class, elig_class, "classes")
 
 ### Eligible monthly panels
 
-class_monthly_elig <- class_monthly |>
-  semi_join(filter(elig_class, eligible), by = "bnf_class_code")
+class_monthly_elig <- class_monthly %>%
+  semi_join(filter(elig_class, eligible), by = "bnf_class_code") # retain rows with matching identifiers
 
-drug_monthly_elig <- drug_monthly |>
-  semi_join(filter(elig_drug, eligible), by = "bnf_drug_code")
+drug_monthly_elig <- drug_monthly %>%
+  semi_join(filter(elig_drug, eligible), by = "bnf_drug_code") # retain rows with matching identifiers
 
 ### Eligibility outputs
 
@@ -138,8 +138,8 @@ fwrite(excl_drug,          file.path(data_dir, "appendix1_exclusions_drug.csv"))
 fwrite(excl_class_summary, file.path(data_dir, "appendix1_exclusions_class_summary.csv"))
 fwrite(excl_drug_summary,  file.path(data_dir, "appendix1_exclusions_drug_summary.csv"))
 
-cc <- filter(coverage, level == "class")
-cd <- filter(coverage, level == "drug")
+cc <- filter(coverage, level == "class") # filter rows
+cd <- filter(coverage, level == "drug") # filter rows
 cat(sprintf(paste0(
   "Complete.\n",
   "  Classes: %d eligible / %d total (excluded item share %.3f%%)\n",
@@ -151,13 +151,13 @@ cat(sprintf(paste0(
 # Surface high-volume exclusions for manual review of possible coding drift.
 if (nrow(excl_drug)) {
   cat("  Largest excluded drugs:\n")
-  print(excl_drug |> slice_head(n = 20) |>
-          select(bnf_drug_code, bnf_drug_name, total_items, reason))
+  print(excl_drug %>% slice_head(n = 20) %>% # slice rows
+          select(bnf_drug_code, bnf_drug_name, total_items, reason)) # retain the stated columns
 }
 if (nrow(excl_class)) {
   cat("  Largest excluded classes:\n")
-  print(excl_class |> slice_head(n = 20) |>
-          select(bnf_class_code, bnf_class_name, total_items, reason))
+  print(excl_class %>% slice_head(n = 20) %>% # slice rows
+          select(bnf_class_code, bnf_class_name, total_items, reason)) # retain the stated columns
 }
 
 ## 02.2 Define the diagnostic-routed seasonal model ---------------------------
@@ -216,8 +216,12 @@ fit_test_series <- function(series, covar,
     converged = FALSE, note = NA_character_, stringsAsFactors = FALSE)
 
   tryCatch({
-    d <- merge(covar, series[, c("year_month", "items")], by = "year_month")
-    d <- d[order(d$t), ]
+    d <- covar %>%
+      left_join(                         # attach the series item counts
+        series %>% select(year_month, items), # select columns
+        by = "year_month"
+      ) %>%
+      arrange(t)                         # restore chronological order
     if (nrow(d) != nrow(covar) || anyNA(d$items))
       stop("series does not cover all 48 months")
     if (!offset_col %in% names(d)) stop("offset column not found: ", offset_col)
@@ -275,24 +279,24 @@ fit_test_series <- function(series, covar,
 
 stopifnot(exists("fit_test_series"), exists("covar"), exists("class_monthly_elig"))
 
-screen_class <- class_monthly_elig |>
-  select(bnf_class_code, bnf_class_name, year_month, items) |>
-  group_by(bnf_class_code, bnf_class_name) |>
-  group_modify(~ fit_test_series(.x, covar)) |>
-  ungroup()
+screen_class <- class_monthly_elig %>%
+  select(bnf_class_code, bnf_class_name, year_month, items) %>% # retain the stated columns
+  group_by(bnf_class_code, bnf_class_name) %>% # define groups for the next step
+  group_modify(~ fit_test_series(.x, covar)) %>%
+  ungroup() # remove grouping
 
 # Apply BH correction once across the complete eligible-class family.
-screen_class <- screen_class |>
-  mutate(class_q_bh = p.adjust(p_value, method = "BH"),
+screen_class <- screen_class %>%
+  mutate(class_q_bh = p.adjust(p_value, method = "BH"), # derive or update the stated columns
          class_significant = !is.na(class_q_bh) & class_q_bh < fdr_alpha,
          inference_scope = "primary_inferential",
-         multiplicity_family = "all_eligible_classes") |>
-  arrange(class_q_bh)
+         multiplicity_family = "all_eligible_classes") %>%
+  arrange(class_q_bh) # apply the stated row order
 
 # Summarise the distribution and inference route used across classes.
-route_summary_class <- screen_class |>
-  count(distribution, route, name = "n") |>
-  mutate(pct = round(100 * n / sum(n), 1))
+route_summary_class <- screen_class %>%
+  count(distribution, route, name = "n") %>% # count the stated groups
+  mutate(pct = round(100 * n / sum(n), 1)) # derive or update the stated columns
 
 n_fail_class <- sum(!screen_class$converged)
 
@@ -317,45 +321,45 @@ stopifnot(exists("fit_test_series"), exists("covar"),
           exists("drug_monthly_elig"), exists("screen_class"))
 
 # Fit every eligible drug with the same diagnostic-routing function.
-screen_drug <- drug_monthly_elig |>
-  select(bnf_class_code, bnf_drug_code, bnf_drug_name, year_month, items) |>
-  group_by(bnf_class_code, bnf_drug_code, bnf_drug_name) |>
-  group_modify(~ fit_test_series(.x, covar)) |>
-  ungroup()
+screen_drug <- drug_monthly_elig %>%
+  select(bnf_class_code, bnf_drug_code, bnf_drug_name, year_month, items) %>% # retain the stated columns
+  group_by(bnf_class_code, bnf_drug_code, bnf_drug_name) %>% # define groups for the next step
+  group_modify(~ fit_test_series(.x, covar)) %>%
+  ungroup() # remove grouping
 
 # Apply BH correction across every eligible drug; parent-class significance is
 # descriptive context and never controls which drugs enter this family.
-screen_drug <- screen_drug |>
-  mutate(drug_all_q_bh = p.adjust(p_value, method = "BH"),
+screen_drug <- screen_drug %>%
+  mutate(drug_all_q_bh = p.adjust(p_value, method = "BH"), # derive or update the stated columns
          drug_significant = !is.na(drug_all_q_bh) & drug_all_q_bh < fdr_alpha,
          inference_scope = "secondary_exploratory",
-         multiplicity_family = "all_eligible_drugs") |>
-  left_join(
-    screen_class |>
-      select(bnf_class_code, bnf_class_name, class_q_bh, class_significant),
+         multiplicity_family = "all_eligible_drugs") %>%
+  left_join( # attach matching fields to the left table
+    screen_class %>%
+      select(bnf_class_code, bnf_class_name, class_q_bh, class_significant), # retain the stated columns
     by = "bnf_class_code"
-  ) |>
-  mutate(parent_class_significant = class_significant)
+  ) %>%
+  mutate(parent_class_significant = class_significant) # derive or update the stated columns
 
 # Preserve the selected-parent calculation as a named audit field only.
-conditional_legacy <- screen_drug |>
-  filter(parent_class_significant) |>
-  transmute(
+conditional_legacy <- screen_drug %>%
+  filter(parent_class_significant) %>% # retain rows meeting these conditions
+  transmute( # derive and retain the stated columns
     bnf_drug_code,
     conditional_drug_q_legacy = p.adjust(p_value, method = "BH")
   )
-screen_drug <- screen_drug |>
-  left_join(conditional_legacy, by = "bnf_drug_code") |>
-  mutate(
+screen_drug <- screen_drug %>%
+  left_join(conditional_legacy, by = "bnf_drug_code") %>% # attach matching fields to the left table
+  mutate( # derive or update the stated columns
     conditional_drug_significant_legacy = parent_class_significant &
       !is.na(conditional_drug_q_legacy) &
       conditional_drug_q_legacy < fdr_alpha
-  ) |>
-  arrange(drug_all_q_bh, bnf_drug_code)
+  ) %>%
+  arrange(drug_all_q_bh, bnf_drug_code) # apply the stated row order
 
-route_summary_drug <- screen_drug |>
-  count(distribution, route, name = "n") |>
-  mutate(pct = round(100 * n / sum(n), 1))
+route_summary_drug <- screen_drug %>%
+  count(distribution, route, name = "n") %>% # count the stated groups
+  mutate(pct = round(100 * n / sum(n), 1)) # derive or update the stated columns
 
 n_fail_drug <- sum(!screen_drug$converged)
 
@@ -378,13 +382,13 @@ print(route_summary_drug)
 
 # Model-level failures remain visible in the screening tables and are also
 # collected in one release-facing file.
-model_failures <- bind_rows(
-  screen_class |>
-    filter(!converged) |>
-    transmute(level = "class", code = as.character(bnf_class_code), note),
-  screen_drug |>
-    filter(!converged) |>
-    transmute(level = "drug", code = as.character(bnf_drug_code), note)
+model_failures <- bind_rows( # combine rows
+  screen_class %>%
+    filter(!converged) %>% # retain rows meeting these conditions
+    transmute(level = "class", code = as.character(bnf_class_code), note), # derive and retain the stated columns
+  screen_drug %>%
+    filter(!converged) %>% # retain rows meeting these conditions
+    transmute(level = "drug", code = as.character(bnf_drug_code), note) # derive and retain the stated columns
 )
 fwrite(model_failures, file.path(data_dir, "model_failures.csv"))
 
@@ -449,13 +453,23 @@ stopifnot(exists(".nb_fit"), exists(".f_full"), exists("covar"),
 # Average cross-year correlations after removing the shared spline trend.
 .seasonal_reproducibility <- function(series, covar) {
   tryCatch({
-    d <- merge(covar, series[, c("year_month", "items")], by = "year_month")
-    d <- d[order(d$t), ]; d$off <- d$offset_log_patient_days
+    d <- covar %>%
+      left_join(                         # attach the series item counts
+        series %>% select(year_month, items), # select columns
+        by = "year_month"
+      ) %>%
+      arrange(t) %>%                     # restore chronological order
+      mutate(off = offset_log_patient_days) # expose the model offset
     ft <- glm(items ~ trend1 + trend2 + trend3 + offset(off), poisson, data = d)
     d$lr   <- log(d$items) - predict(ft, type = "link")   # detrended log-residual
     d$year <- d$year_month %/% 100L; d$mon <- d$year_month %% 100L
     years <- sort(unique(d$year))
-    mat <- sapply(years, function(y) { dy <- d[d$year == y, ]; dy$lr[order(dy$mon)] })
+    mat <- sapply(years, function(y) {
+      d %>%
+        filter(year == y) %>%             # isolate one calendar year
+        arrange(mon) %>%                   # order its calendar months
+        pull(lr)                           # return the detrended log-rate
+    })
     if (!is.matrix(mat) || ncol(mat) < 2) return(NA_real_)
     cc <- suppressWarnings(cor(mat))
     mean(cc[lower.tri(cc)], na.rm = TRUE)
@@ -466,8 +480,12 @@ stopifnot(exists(".nb_fit"), exists(".f_full"), exists("covar"),
 .stl_strength <- function(series, covar,
                           offset_col = "offset_log_patient_days") {
   tryCatch({
-    d <- merge(covar, series[, c("year_month", "items")], by = "year_month")
-    d <- d[order(d$t), ]
+    d <- covar %>%
+      left_join(                         # attach the series item counts
+        series %>% select(year_month, items), # select columns
+        by = "year_month"
+      ) %>%
+      arrange(t)                         # restore chronological order
     if (!offset_col %in% names(d)) stop("offset column not found: ", offset_col)
     x <- ts(log(d$items) - d[[offset_col]], frequency = 12)
     fit <- stl(x, s.window = "periodic", robust = TRUE)
@@ -496,8 +514,13 @@ characterise_one <- function(scr_row, series, covar) {
 
   # refit 1- and 2-harmonic models under the chosen distribution (for AIC
   # modality) and reuse the 2-harmonic fit for the peak:trough CI
-  d <- merge(covar, series[, c("year_month", "items")], by = "year_month")
-  d <- d[order(d$t), ]; d$off <- d$offset_log_patient_days
+  d <- covar %>%
+    left_join(                           # attach the series item counts
+      series %>% select(year_month, items), # select columns
+      by = "year_month"
+    ) %>%
+    arrange(t) %>%                       # restore chronological order
+    mutate(off = offset_log_patient_days) # expose the model offset
   fits <- if (identical(scr_row$distribution, "negbin")) {
     f2 <- .nb_fit(.f_full, d); f1 <- .nb_fit(.f_1h, d)
     if (is.null(f1) || is.null(f2)) NULL else list(f1 = f1, f2 = f2)
@@ -522,17 +545,17 @@ characterise_one <- function(scr_row, series, covar) {
 
 # Apply characterisation to the discoveries at one analysis level.
 characterise_level <- function(scr, monthly, id_cols, keep_flag) {
-  sig <- scr |> filter({{keep_flag}})
+  sig <- scr %>% filter({{keep_flag}}) # filter rows
   if (nrow(sig) == 0) return(tibble())
-  sig |>
-    group_by(across(all_of(id_cols))) |>
+  sig %>%
+    group_by(across(all_of(id_cols))) %>% # define groups for the next step
     group_modify(function(row, key) {
-      ser <- monthly |> semi_join(key, by = id_cols)
+      ser <- monthly %>% semi_join(key, by = id_cols) # join matching rows
       characterise_one(row, ser, covar)
-    }) |>
-    ungroup() |>
-    left_join(scr, by = id_cols) |>
-    arrange(desc(peak_trough_ratio))
+    }) %>%
+    ungroup() %>% # remove grouping
+    left_join(scr, by = id_cols) %>% # attach matching fields to the left table
+    arrange(desc(peak_trough_ratio)) # apply the stated row order
 }
 
 # Characterise only discoveries from the two complete BH families.
@@ -554,9 +577,9 @@ cat(sprintf(paste0(
   paste(head(names(sort(table(char_class$peak_month), decreasing = TRUE)), 3), collapse = ", "),
   nrow(char_drug)))
 cat("\nTop 10 classes by amplitude (peak:trough ratio with 95% CI):\n")
-print(char_class |> slice_head(n = 10) |>
-        mutate(ptr = sprintf("%.2f (%.2f-%.2f)", peak_trough_ratio, ptr_lci, ptr_uci)) |>
-        select(bnf_class_name, ptr, peak_month, modality, class_q_bh))
+print(char_class %>% slice_head(n = 10) %>% # slice rows
+        mutate(ptr = sprintf("%.2f (%.2f-%.2f)", peak_trough_ratio, ptr_lci, ptr_uci)) %>% # derive or update the stated columns
+        select(bnf_class_name, ptr, peak_month, modality, class_q_bh)) # retain the stated columns
 
 
 ## 02.6 Define meaningful seasonality and save analysis results ---------------
@@ -574,8 +597,8 @@ fig_dir <- file.path(data_dir, "figures")
 dir.create(fig_dir, showWarnings = FALSE)
 
 ## Class results retain inferential scope and rounded reporting measures.
-results_class <- char_class |>
-  transmute(bnf_class_code, bnf_class_name,
+results_class <- char_class %>%
+  transmute(bnf_class_code, bnf_class_name, # derive and retain the stated columns
             inference_scope = "primary_inferential",
             multiplicity_family = "all_eligible_classes",
             peak_trough_ratio = round(peak_trough_ratio, 3),
@@ -586,12 +609,12 @@ results_class <- char_class |>
             stl_trend_strength    = round(stl_trend_strength, 3),
             distribution, route, hac_capped, class_q_bh, class_significant,
             meaningful = ptr_lci >= meaningful_threshold &
-              stl_seasonal_strength >= stl_strength_threshold) |>
-  arrange(desc(meaningful), desc(peak_trough_ratio))
+              stl_seasonal_strength >= stl_strength_threshold) %>%
+  arrange(desc(meaningful), desc(peak_trough_ratio)) # apply the stated row order
 
 ## Drug results are explicitly labelled as secondary and exploratory.
-results_drug <- char_drug |>
-  transmute(bnf_drug_code, bnf_drug_name, bnf_class_name,
+results_drug <- char_drug %>%
+  transmute(bnf_drug_code, bnf_drug_name, bnf_class_name, # derive and retain the stated columns
             inference_scope = "secondary_exploratory",
             multiplicity_family = "all_eligible_drugs",
             peak_trough_ratio = round(peak_trough_ratio, 3),
@@ -605,21 +628,21 @@ results_drug <- char_drug |>
             conditional_drug_q_legacy,
             conditional_drug_significant_legacy,
             meaningful = ptr_lci >= meaningful_threshold &
-              stl_seasonal_strength >= stl_strength_threshold) |>
-  arrange(desc(meaningful), desc(peak_trough_ratio))
+              stl_seasonal_strength >= stl_strength_threshold) %>%
+  arrange(desc(meaningful), desc(peak_trough_ratio)) # apply the stated row order
 
 ### Compact diagnostic figures
 
 # observed + fitted monthly rate (per 1000 registered patients) for one class
 .fit_frame <- function(code) {
-  ser  <- class_monthly_elig |> filter(bnf_class_code == code) |> select(year_month, items)
-  d    <- covar |> left_join(ser, by = "year_month") |> arrange(t)
+  ser  <- class_monthly_elig %>% filter(bnf_class_code == code) %>% select(year_month, items) # filter rows; select columns
+  d    <- covar %>% left_join(ser, by = "year_month") %>% arrange(t) # order rows; join matching rows
   d$off <- d$offset_log_patient_days
   dist <- char_class$distribution[char_class$bnf_class_code == code][1]
   fit  <- if (identical(dist, "negbin")) .nb_fit(.f_full, d) else NULL
   if (is.null(fit)) fit <- glm(.f_full, poisson, data = d)
   nm <- char_class$bnf_class_name[char_class$bnf_class_code == code][1]
-  d |> transmute(class = nm, month_date,
+  d %>% transmute(class = nm, month_date, # derive columns
                  observed = items / list_size * 1000,
                  fitted   = as.numeric(fitted(fit)) / list_size * 1000)
 }
@@ -627,16 +650,16 @@ results_drug <- char_drug |>
 # Exemplars: strongest MEANINGFUL seasonality (so structural-break and trivial
 # classes are excluded by construction), excluding the extreme vaccine/antiviral
 # series whose amplitude would flatten the shared axes
-exemplar_class_codes <- results_class |>
-  filter(meaningful, peak_trough_ratio < 10) |>
-  slice_head(n = 6) |> pull(bnf_class_code)
+exemplar_class_codes <- results_class %>%
+  filter(meaningful, peak_trough_ratio < 10) %>% # retain rows meeting these conditions
+  slice_head(n = 6) %>% pull(bnf_class_code) # retain the first requested rows
 
 if (length(exemplar_class_codes)) {
-  fit_df <- bind_rows(lapply(exemplar_class_codes, .fit_frame)) %>%
-    arrange(class)
+  fit_df <- bind_rows(lapply(exemplar_class_codes, .fit_frame)) %>% # combine rows
+    arrange(class) # apply the stated row order
   fit_df$class <- factor(fit_df$class,
-                         levels = results_class |> filter(bnf_class_code %in% exemplar_class_codes) |>
-                           arrange(desc(peak_trough_ratio)) |> pull(bnf_class_name))
+                         levels = results_class %>% filter(bnf_class_code %in% exemplar_class_codes) %>% # filter rows
+                           arrange(desc(peak_trough_ratio)) %>% pull(bnf_class_name)) # apply the stated row order
   fit_df$class <- factor(fit_df$class,
                          levels = sort(unique(as.character(fit_df$class))))
 
@@ -653,9 +676,9 @@ if (length(exemplar_class_codes)) {
          width = 9, height = 8, dpi = 300)
 
   # seasonal multiplicative factor by calendar month (from harmonic coefficients)
-  shape_df <- char_class |>
-    filter(bnf_class_code %in% exemplar_class_codes) |>
-    group_by(bnf_class_name) |>
+  shape_df <- char_class %>%
+    filter(bnf_class_code %in% exemplar_class_codes) %>% # retain rows meeting these conditions
+    group_by(bnf_class_name) %>% # define groups for the next step
     reframe(month = 1:12,
             factor = { s <- .seasonal_curve(b_sin12, b_cos12, b_sin6, b_cos6, 1:12)
             f <- exp(s); f / mean(f) })
@@ -676,11 +699,11 @@ if (length(exemplar_class_codes)) {
 ### Route summaries and crosswalks
 
 # distribution / route proportions across both levels
-appendix_routes <- bind_rows(
-  screen_class |> count(distribution, route, name = "n") |> mutate(level = "class"),
-  screen_drug  |> count(distribution, route, name = "n") |> mutate(level = "drug")) |>
-  group_by(level) |> mutate(pct = round(100 * n / sum(n), 1)) |> ungroup() |>
-  select(level, distribution, route, n, pct)
+appendix_routes <- bind_rows( # combine rows
+  screen_class %>% count(distribution, route, name = "n") %>% mutate(level = "class"), # derive columns; count groups
+  screen_drug  %>% count(distribution, route, name = "n") %>% mutate(level = "drug")) %>% # derive columns; count groups
+  group_by(level) %>% mutate(pct = round(100 * n / sum(n), 1)) %>% ungroup() %>% # define groups for the next step
+  select(level, distribution, route, n, pct) # retain the stated columns
 
 # recode crosswalk (if reconciliation was applied this session)
 if (exists("xwalk_drug"))  fwrite(xwalk_drug,  file.path(data_dir, "appendix_recode_crosswalk_drug.csv"))
@@ -694,7 +717,7 @@ fwrite(appendix_routes, file.path(data_dir, "appendix_route_proportions.csv"))
 saveRDS(results_class,  file.path(data_dir, "results_class.rds"))
 saveRDS(results_drug,   file.path(data_dir, "results_drug.rds"))
 # Record the two independent multiplicity families and their interpretation.
-inference_scope_metadata <- data.table(
+inference_scope_metadata <- tibble(
   level = c("class", "drug", "hierarchy"),
   analysis_role = c("primary_inferential", "secondary_exploratory", "not_applicable"),
   multiplicity_family = c(
@@ -723,10 +746,10 @@ cat(sprintf(paste0(
   nrow(results_drug), sum(results_drug$meaningful),
   length(exemplar_class_codes), fig_dir))
 cat("\nMain-text classes (meaningful seasonality, by amplitude):\n")
-print(results_class |> filter(meaningful) |>
-        mutate(ptr = sprintf("%.2f (%.2f-%.2f)", peak_trough_ratio, ptr_lci, ptr_uci)) |>
-        select(bnf_class_name, ptr, peak_month, modality, stl_seasonal_strength) |>
-        slice_head(n = 20))
+print(results_class %>% filter(meaningful) %>% # filter rows
+        mutate(ptr = sprintf("%.2f (%.2f-%.2f)", peak_trough_ratio, ptr_lci, ptr_uci)) %>% # derive or update the stated columns
+        select(bnf_class_name, ptr, peak_month, modality, stl_seasonal_strength) %>% # retain the stated columns
+        slice_head(n = 20)) # retain the first requested rows
 
 
 ## 02.7 Create publication-ready tables --------------------------------------
@@ -767,16 +790,16 @@ bnf_class_dotted <- function(code) {
 }
 
 # BNF chapter lookup from the eligible monthly frames
-chap_class <- class_monthly_elig |>
-  distinct(bnf_class_code, bnf_chapter_code, bnf_chapter_name)
-chap_drug <- drug_monthly_elig |>
-  distinct(bnf_drug_code, bnf_chapter_code, bnf_chapter_name)
+chap_class <- class_monthly_elig %>%
+  distinct(bnf_class_code, bnf_chapter_code, bnf_chapter_name) # retain distinct rows
+chap_drug <- drug_monthly_elig %>%
+  distinct(bnf_drug_code, bnf_chapter_code, bnf_chapter_name) # retain distinct rows
 
 ## ---- MAIN TEXT: Table 1, meaningful-seasonal classes ------------------------
 
-main_table_classes <- results_class |>
-  filter(meaningful) |>
-  transmute(
+main_table_classes <- results_class %>%
+  filter(meaningful) %>% # retain rows meeting these conditions
+  transmute( # derive and retain the stated columns
     `BNF class code`                = bnf_class_dotted(bnf_class_code),
     `BNF class`                     = bnf_class_name,
     `Peak-to-trough ratio (95% CI)` = fmt_ci(peak_trough_ratio, ptr_lci, ptr_uci),
@@ -789,9 +812,9 @@ fwrite(main_table_classes, file.path(tab_dir, "table1_meaningful_classes.csv"))
 
 ## ---- MAIN TEXT: Table 2, meaningful-seasonal drugs -------------------------
 # Parent-class significance is descriptive and does not select drug tests.
-main_table_drugs <- results_drug |>
-  filter(meaningful) |>
-  transmute(
+main_table_drugs <- results_drug %>%
+  filter(meaningful) %>% # retain rows meeting these conditions
+  transmute( # derive and retain the stated columns
     `BNF class code`                = sub("^(\\d{2})(\\d{2})(\\d{2})$", "\\1.\\2.\\3",
                                           substr(as.character(bnf_drug_code), 1, 6)),
     `BNF class`                     = bnf_class_name,
@@ -827,9 +850,9 @@ fwrite(accounting, file.path(tab_dir, "table_accounting.csv"))
 
 ## ---- APPENDIX: full class and drug results ---------------------------------
 
-appendix_table_classes <- results_class |>
-  left_join(chap_class, by = "bnf_class_code") |>
-  transmute(
+appendix_table_classes <- results_class %>%
+  left_join(chap_class, by = "bnf_class_code") %>% # attach matching fields to the left table
+  transmute( # derive and retain the stated columns
     `BNF chapter` = bnf_chapter_name, `BNF class code` = bnf_class_dotted(bnf_class_code),
     `BNF class` = bnf_class_name, `Inference scope` = "Primary inferential",
     `Peak-to-trough ratio` = sprintf("%.3f", peak_trough_ratio),
@@ -846,9 +869,9 @@ appendix_table_classes <- results_class |>
     `Meaningful seasonality` = ifelse(meaningful, "Yes", "No"))
 fwrite(appendix_table_classes, file.path(tab_dir, "appendixA1_all_classes.csv"))
 
-appendix_table_drugs <- results_drug |>
-  left_join(chap_drug, by = "bnf_drug_code") |>
-  transmute(
+appendix_table_drugs <- results_drug %>%
+  left_join(chap_drug, by = "bnf_drug_code") %>% # attach matching fields to the left table
+  transmute( # derive and retain the stated columns
     `BNF chapter` = bnf_chapter_name,
     `BNF class code` = sub("^(\\d{2})(\\d{2})(\\d{2})$", "\\1.\\2.\\3",
                            substr(as.character(bnf_drug_code), 1, 6)),
@@ -876,14 +899,14 @@ cov_one <- function(tab, lvl) {
          excluded            = sum(!elig),
          excluded_item_share = sum(tab$total_items[!elig]) / sum(tab$total_items))
 }
-coverage <- bind_rows(cov_one(elig_class, "class"), cov_one(elig_drug, "drug"))
+coverage <- bind_rows(cov_one(elig_class, "class"), cov_one(elig_drug, "drug")) # combine rows
 
 if (exists("coverage"))   fwrite(coverage,   file.path(tab_dir, "appendix_coverage_summary.csv"))
 if (exists("excl_class") && nrow(excl_class))
-  fwrite(excl_class |> mutate(bnf_class_code = bnf_class_dotted(bnf_class_code)),
+  fwrite(excl_class %>% mutate(bnf_class_code = bnf_class_dotted(bnf_class_code)), # derive columns
          file.path(tab_dir, "appendix_exclusions_class.csv"))
 if (exists("excl_drug") && nrow(excl_drug))
-  fwrite(excl_drug |> mutate(bnf_drug_code = as.character(bnf_drug_code)),
+  fwrite(excl_drug %>% mutate(bnf_drug_code = as.character(bnf_drug_code)), # derive columns
          file.path(tab_dir, "appendix_exclusions_drug.csv"))
 if (exists("xwalk_drug")) fwrite(xwalk_drug, file.path(tab_dir, "appendix_recode_crosswalk.csv"))
 if (exists("appendix_routes")) fwrite(appendix_routes, file.path(tab_dir, "appendix_route_proportions.csv"))

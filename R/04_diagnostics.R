@@ -10,7 +10,7 @@ run_diagnostics <- function(state) {
   # Collect all diagnostic-release gates in a single table.
   stage6_checks <- list()
   add_stage6_check <- function(check_id, pass, expected, observed, details = "") {
-    stage6_checks[[length(stage6_checks) + 1L]] <<- data.table(
+    stage6_checks[[length(stage6_checks) + 1L]] <<- tibble(
       check_id = check_id, pass = isTRUE(pass), expected = as.character(expected),
       observed = as.character(observed), details = as.character(details)
     )
@@ -99,8 +99,12 @@ run_diagnostics <- function(state) {
   # Recreate the mean model using the distribution selected in the primary screen.
   fit_primary_mean <- function(series, screen_row) {
     tryCatch({
-      d <- merge(covar, series[, c("year_month", "items")], by = "year_month")
-      d <- d[order(d$t), ]
+      d <- covar %>%
+        left_join(                         # attach one series to shared covariates
+          series %>% select(year_month, items), # select columns
+          by = "year_month"
+        ) %>%
+        arrange(t)                         # restore chronological order
       if (nrow(d) != nrow(covar) || anyNA(d$items)) {
         stop("series does not form one complete 48-month model input")
       }
@@ -122,7 +126,7 @@ run_diagnostics <- function(state) {
   diagnose_primary_series <- function(series, screen_row) {
     fitted_object <- fit_primary_mean(series, screen_row)
     if (!fitted_object$ok) {
-      return(data.table(
+      return(tibble(
         diagnostic_refit_converged = FALSE,
         diagnostic_refit_note = fitted_object$note,
         n_model_months = NA_integer_, pearson_residual_rmse = NA_real_,
@@ -164,7 +168,7 @@ run_diagnostics <- function(state) {
       screen_row$b_sin6[[1]], screen_row$b_cos6[[1]]
     )
     stl_values <- .stl_strength(series, covar)
-    data.table(
+    tibble(
       diagnostic_refit_converged = TRUE,
       diagnostic_refit_note = NA_character_,
       n_model_months = nrow(d),
@@ -187,13 +191,15 @@ run_diagnostics <- function(state) {
 
   # Apply the same diagnostic calculation to each class or drug series.
   diagnose_level <- function(monthly, screen, id_col, name_col, level_name) {
-    rbindlist(lapply(seq_len(nrow(screen)), function(i) {
-      screen_row <- screen[i, , drop = FALSE]
+    seq_len(nrow(screen)) %>%
+      lapply(function(i) {
+      screen_row <- screen %>% slice(i)   # isolate one screening result
       code <- as.character(screen_row[[id_col]][[1]])
-      series <- monthly[as.character(monthly[[id_col]]) == code,
-                        c("year_month", "items")]
+      series <- monthly %>%
+        filter(as.character(.data[[id_col]]) == code) %>% # isolate its monthly records
+        select(year_month, items)          # retain model inputs
       metrics <- diagnose_primary_series(series, screen_row)
-      data.table(
+      identifiers <- tibble(
         level = level_name,
         series_code = code,
         series_name = as.character(screen_row[[name_col]][[1]]),
@@ -227,8 +233,10 @@ run_diagnostics <- function(state) {
         theta = as.numeric(screen_row$theta[[1]]),
         original_model_converged = as.logical(screen_row$converged[[1]]),
         original_model_note = as.character(screen_row$note[[1]])
-      )[, cbind(.SD, metrics)]
-    }), use.names = TRUE)
+      )
+      bind_cols(identifiers, metrics)      # combine identifiers and diagnostics
+    }) %>%
+      bind_rows()                          # combine every series
   }
 
   diagnostic_class <- diagnose_level(
@@ -239,15 +247,13 @@ run_diagnostics <- function(state) {
     drug_monthly_elig, screen_drug,
     "bnf_drug_code", "bnf_drug_name", "drug"
   )
-  diagnostic_inventory <- rbindlist(
-    list(diagnostic_class, diagnostic_drug), use.names = TRUE
-  )
-  setorder(diagnostic_inventory, level, seasonality_q_bh, series_code)
+  diagnostic_inventory <- bind_rows(diagnostic_class, diagnostic_drug) %>% # combine rows
+    arrange(level, seasonality_q_bh, series_code) # retain stable diagnostic order
 
   add_stage6_check(
     "diagnostic_inventory_complete",
     nrow(diagnostic_class) == 220L && nrow(diagnostic_drug) == 974L &&
-      !anyDuplicated(diagnostic_inventory[, .(level, series_code)]) &&
+      (diagnostic_inventory %>% count(level, series_code) %>% filter(n > 1L) %>% nrow()) == 0L && # filter rows; count groups
       all(diagnostic_inventory$n_model_months == 48L) &&
       all(diagnostic_inventory$diagnostic_refit_converged),
     "220 class and 974 drug diagnostic refits, each using 48 months",
@@ -255,17 +261,19 @@ run_diagnostics <- function(state) {
             nrow(diagnostic_class), nrow(diagnostic_drug),
             sum(!diagnostic_inventory$diagnostic_refit_converged))
   )
-  diagnostic_values_finite <- diagnostic_inventory[
-    diagnostic_refit_converged == TRUE,
-    all(is.finite(pearson_residual_rmse)) &&
-      all(is.finite(max_abs_pearson_residual)) &&
-      all(is.finite(max_abs_residual_acf)) &&
-      all(is.finite(max_cooks_distance)) &&
-      all(is.finite(max_segment_mean_shift_sd)) &&
-      all(is.finite(harmonic_peak_trough_ratio)) &&
-      all(is.finite(diagnostic_stl_seasonal_strength)) &&
-      all(is.finite(diagnostic_stl_trend_strength))
-  ]
+  diagnostic_values_finite <- diagnostic_inventory %>%
+    filter(diagnostic_refit_converged) %>% # retain completed refits
+    summarise(                            # require every diagnostic to be finite
+      passed = all(is.finite(pearson_residual_rmse)) &&
+        all(is.finite(max_abs_pearson_residual)) &&
+        all(is.finite(max_abs_residual_acf)) &&
+        all(is.finite(max_cooks_distance)) &&
+        all(is.finite(max_segment_mean_shift_sd)) &&
+        all(is.finite(harmonic_peak_trough_ratio)) &&
+        all(is.finite(diagnostic_stl_seasonal_strength)) &&
+        all(is.finite(diagnostic_stl_trend_strength))
+    ) %>%
+    pull(passed) # extract the stated column
   add_stage6_check(
     "diagnostic_metrics_valid", diagnostic_values_finite,
     "finite residual, influence, ACF, amplitude and STL metrics for every refit",
@@ -277,17 +285,22 @@ run_diagnostics <- function(state) {
   selection_parts <- list()
   # Add existing requested codes to the detailed-review selection.
   add_selection <- function(inventory, codes, reason) {
-    rows <- inventory[series_code %in% as.character(codes),
-                      .(level, series_code, series_name)]
+    rows <- inventory %>%
+      filter(series_code %in% as.character(codes)) %>% # retain requested series
+      select(level, series_code, series_name) # retain selection identifiers
     if (nrow(rows)) {
-      rows[, selection_reason := reason]
+      rows <- rows %>%
+        mutate(selection_reason = reason)     # record why each series was selected
       selection_parts[[length(selection_parts) + 1L]] <<- rows
     }
   }
   # Select the largest finite values of one diagnostic metric.
   top_metric_codes <- function(inventory, metric, n = 5L) {
-    values <- inventory[is.finite(get(metric))][order(-get(metric))]
-    head(values$series_code, n)
+    inventory %>%
+      filter(is.finite(.data[[metric]])) %>% # discard undefined metrics
+      arrange(desc(.data[[metric]])) %>%     # rank the largest values
+      slice_head(n = n) %>%                  # retain the requested count
+      pull(series_code) # extract the stated column
   }
 
   add_selection(
@@ -297,12 +310,16 @@ run_diagnostics <- function(state) {
   )
   add_selection(
     diagnostic_class,
-    head(diagnostic_class[order(abs(seasonality_q_bh - fdr_alpha))]$series_code, 10L),
+    diagnostic_class %>%
+      arrange(abs(seasonality_q_bh - fdr_alpha)) %>% # rank proximity to BH cutoff
+      slice_head(n = 10L) %>%               # retain boundary cases
+      pull(series_code), # extract the stated column
     "10 classes closest to the class BH boundary"
   )
-  class_strength_boundary <- as.data.table(char_class)[
-    ptr_lci >= meaningful_threshold
-  ][order(abs(stl_seasonal_strength - stl_strength_threshold))]
+  class_strength_boundary <- char_class %>%
+    as_tibble() %>%                        # standardise the characterisation table
+    filter(ptr_lci >= meaningful_threshold) %>% # retain amplitude-qualified classes
+    arrange(abs(stl_seasonal_strength - stl_strength_threshold)) # rank STL proximity
   add_selection(
     diagnostic_class, head(class_strength_boundary$bnf_class_code, 10L),
     "10 amplitude-qualified classes closest to the STL boundary"
@@ -316,42 +333,57 @@ run_diagnostics <- function(state) {
   }
   add_selection(
     diagnostic_class,
-    diagnostic_class[harmonic_peak_trough_ratio >= 10, series_code],
+    diagnostic_class %>%
+      filter(harmonic_peak_trough_ratio >= 10) %>% # retain extreme amplitudes
+      pull(series_code), # extract the stated column
     "extreme harmonic amplitude (peak-to-trough ratio at least 10)"
   )
   add_selection(
     diagnostic_class,
-    head(diagnostic_class[
-      diagnostic_stl_trend_strength >= 0.80 &
+    diagnostic_class %>%
+      filter(                               # retain trend-dominated profiles
+        diagnostic_stl_trend_strength >= 0.80,
         diagnostic_stl_seasonal_strength < stl_strength_threshold
-    ][order(-diagnostic_stl_trend_strength)]$series_code, 5L),
+      ) %>%
+      arrange(desc(diagnostic_stl_trend_strength)) %>% # rank trend strength
+      slice_head(n = 5L) %>%               # retain five profiles
+      pull(series_code), # extract the stated column
     "five strongest trend-dominated class profiles"
   )
   add_selection(
     diagnostic_class,
-    diagnostic_class[
-      !original_model_converged |
-        (!is.na(original_model_note) & nzchar(original_model_note)) |
-        grepl("NBfail", route, fixed = TRUE),
-      series_code
-    ],
+    diagnostic_class %>%
+      filter(                               # retain failures, notes, and fallbacks
+        !original_model_converged |
+          (!is.na(original_model_note) & nzchar(original_model_note)) |
+          grepl("NBfail", route, fixed = TRUE)
+      ) %>%
+      pull(series_code), # extract the stated column
     "model failure, warning note or negative-binomial fallback"
   )
 
   add_selection(
     diagnostic_drug,
-    head(as.data.table(results_drug)[meaningful == TRUE][order(-peak_trough_ratio)]$bnf_drug_code,
-         10L),
+    results_drug %>%
+      as_tibble() %>%                     # standardise the result table
+      filter(meaningful) %>%              # retain meaningful drugs
+      arrange(desc(peak_trough_ratio)) %>% # rank amplitudes
+      slice_head(n = 10L) %>%             # retain ten drugs
+      pull(bnf_drug_code), # extract the stated column
     "10 highest-amplitude meaningful exploratory drugs"
   )
   add_selection(
     diagnostic_drug,
-    head(diagnostic_drug[order(abs(seasonality_q_bh - fdr_alpha))]$series_code, 10L),
+    diagnostic_drug %>%
+      arrange(abs(seasonality_q_bh - fdr_alpha)) %>% # rank proximity to BH cutoff
+      slice_head(n = 10L) %>%             # retain boundary cases
+      pull(series_code), # extract the stated column
     "10 drugs closest to the all-drug BH boundary"
   )
-  drug_strength_boundary <- as.data.table(char_drug)[
-    ptr_lci >= meaningful_threshold
-  ][order(abs(stl_seasonal_strength - stl_strength_threshold))]
+  drug_strength_boundary <- char_drug %>%
+    as_tibble() %>%                        # standardise the characterisation table
+    filter(ptr_lci >= meaningful_threshold) %>% # retain amplitude-qualified drugs
+    arrange(abs(stl_seasonal_strength - stl_strength_threshold)) # rank STL proximity
   add_selection(
     diagnostic_drug, head(drug_strength_boundary$bnf_drug_code, 20L),
     "20 amplitude-qualified drugs closest to the STL boundary"
@@ -362,7 +394,9 @@ run_diagnostics <- function(state) {
   )
   add_selection(
     diagnostic_drug,
-    threshold_changes[level == "drug", series_code],
+    threshold_changes %>%
+      filter(level == "drug") %>%         # retain drug threshold changes
+      pull(series_code), # extract the stated column
     "drug meaningfulness changed in the 0.40/0.60 STL sensitivity"
   )
   working_changes <- fread(
@@ -371,9 +405,9 @@ run_diagnostics <- function(state) {
   )
   add_selection(
     diagnostic_drug,
-    working_changes[
-      level == "drug" & primary_meaningful & !meaningful, code
-    ],
+    working_changes %>%
+      filter(level == "drug", primary_meaningful, !meaningful) %>% # retain lost drugs
+      pull(code), # extract the stated column
     "primary meaningful drug lost under the working-day sensitivity"
   )
   for (metric in c("max_abs_pearson_residual", "max_abs_residual_acf",
@@ -385,37 +419,47 @@ run_diagnostics <- function(state) {
   }
   add_selection(
     diagnostic_drug,
-    diagnostic_drug[harmonic_peak_trough_ratio >= 10, series_code],
+    diagnostic_drug %>%
+      filter(harmonic_peak_trough_ratio >= 10) %>% # retain extreme amplitudes
+      pull(series_code), # extract the stated column
     "extreme harmonic amplitude (peak-to-trough ratio at least 10)"
   )
   add_selection(
     diagnostic_drug,
-    head(diagnostic_drug[
-      diagnostic_stl_trend_strength >= 0.80 &
+    diagnostic_drug %>%
+      filter(                               # retain trend-dominated profiles
+        diagnostic_stl_trend_strength >= 0.80,
         diagnostic_stl_seasonal_strength < stl_strength_threshold
-    ][order(-diagnostic_stl_trend_strength)]$series_code, 5L),
+      ) %>%
+      arrange(desc(diagnostic_stl_trend_strength)) %>% # rank trend strength
+      slice_head(n = 5L) %>%               # retain five profiles
+      pull(series_code), # extract the stated column
     "five strongest trend-dominated drug profiles"
   )
   add_selection(
     diagnostic_drug,
-    diagnostic_drug[
-      !original_model_converged |
-        (!is.na(original_model_note) & nzchar(original_model_note)) |
-        grepl("NBfail", route, fixed = TRUE),
-      series_code
-    ],
+    diagnostic_drug %>%
+      filter(                               # retain failures, notes, and fallbacks
+        !original_model_converged |
+          (!is.na(original_model_note) & nzchar(original_model_note)) |
+          grepl("NBfail", route, fixed = TRUE)
+      ) %>%
+      pull(series_code), # extract the stated column
     "model failure, warning note or negative-binomial fallback"
   )
 
-  diagnostic_selection <- rbindlist(selection_parts, use.names = TRUE)[, .(
-    selection_reason = paste(sort(unique(selection_reason)), collapse = "; ")
-  ), by = .(level, series_code, series_name)]
-  diagnostic_selection <- merge(
-    diagnostic_selection,
-    diagnostic_inventory,
-    by = c("level", "series_code", "series_name"), all.x = TRUE
-  )
-  setorder(diagnostic_selection, level, series_code)
+  diagnostic_selection <- selection_parts %>%
+    bind_rows() %>%                         # combine all selection routes
+    group_by(level, series_code, series_name) %>% # group duplicate selections
+    summarise(                              # concatenate distinct reasons
+      selection_reason = paste(sort(unique(selection_reason)), collapse = "; "),
+      .groups = "drop"
+    ) %>%
+    left_join(                              # attach full diagnostic metrics
+      diagnostic_inventory,
+      by = c("level", "series_code", "series_name")
+    ) %>%
+    arrange(level, series_code)             # retain stable selection order
 
   ## 04.4 Extract month-level residuals and autocorrelation --------------------
   extract_targeted_details <- function(selection) {
@@ -448,7 +492,7 @@ run_diagnostics <- function(state) {
       pearson <- as.numeric(residuals(fit, type = "pearson"))
       cooks <- suppressWarnings(as.numeric(cooks.distance(fit)))
       fitted_count <- as.numeric(fitted(fit))
-      time_parts[[length(time_parts) + 1L]] <- data.table(
+      time_parts[[length(time_parts) + 1L]] <- tibble(
         level = level_name, series_code = code,
         series_name = selection$series_name[i],
         selection_reason = selection$selection_reason[i],
@@ -462,7 +506,7 @@ run_diagnostics <- function(state) {
         pearson, lag.max = harmonic_period_months[1], plot = FALSE,
         demean = TRUE, na.action = na.pass
       )$acf)[-1]
-      acf_parts[[length(acf_parts) + 1L]] <- data.table(
+      acf_parts[[length(acf_parts) + 1L]] <- tibble(
         level = level_name, series_code = code,
         series_name = selection$series_name[i],
         selection_reason = selection$selection_reason[i],
@@ -470,8 +514,8 @@ run_diagnostics <- function(state) {
       )
     }
     list(
-      timeseries = rbindlist(time_parts, use.names = TRUE),
-      acf = rbindlist(acf_parts, use.names = TRUE)
+      timeseries = bind_rows(time_parts), # combine monthly residual details
+      acf = bind_rows(acf_parts)          # combine residual ACF details
     )
   }
   targeted_details <- extract_targeted_details(diagnostic_selection)
@@ -481,13 +525,13 @@ run_diagnostics <- function(state) {
   add_stage6_check(
     "targeted_selection_complete",
     all(results_class$bnf_class_code[results_class$meaningful] %in%
-          diagnostic_selection[level == "class", series_code]) &&
-      nrow(diagnostic_selection[level == "class"]) < 220L &&
-      nrow(diagnostic_selection[level == "drug"]) < 974L,
+          (diagnostic_selection %>% filter(level == "class") %>% pull(series_code))) && # filter rows; extract column
+      (diagnostic_selection %>% filter(level == "class") %>% nrow()) < 220L && # filter rows
+      (diagnostic_selection %>% filter(level == "drug") %>% nrow()) < 974L, # filter rows
     "all 30 meaningful classes plus targeted boundaries/flags; not all drugs",
     sprintf("%d classes; %d drugs selected",
-            nrow(diagnostic_selection[level == "class"]),
-            nrow(diagnostic_selection[level == "drug"]))
+            diagnostic_selection %>% filter(level == "class") %>% nrow(), # filter rows
+            diagnostic_selection %>% filter(level == "drug") %>% nrow()) # filter rows
   )
   selected_n <- nrow(diagnostic_selection)
   add_stage6_check(
@@ -501,38 +545,44 @@ run_diagnostics <- function(state) {
             nrow(targeted_residual_timeseries), nrow(targeted_residual_acf), selected_n)
   )
 
-  cook_review_thresholds <- diagnostic_inventory[, .(
-    cook_distance_review_threshold = as.numeric(
-      quantile(max_cooks_distance, 0.99, na.rm = TRUE, names = FALSE)
+  cook_review_thresholds <- diagnostic_inventory %>%
+    group_by(level) %>%                    # calculate thresholds within level
+    summarise(                             # take the 99th percentile of influence
+      cook_distance_review_threshold = as.numeric(
+        quantile(max_cooks_distance, 0.99, na.rm = TRUE, names = FALSE)
+      ),
+      .groups = "drop"
     )
-  ), by = level]
-  diagnostic_review_flags <- merge(
-    diagnostic_selection, cook_review_thresholds, by = "level", all.x = TRUE
-  )[, .(
-    level, series_code, series_name, inference_scope, selection_reason,
-    seasonality_q_bh, seasonality_detected,
-    upper_tail_influence = max_cooks_distance >= cook_distance_review_threshold,
-    cook_distance_review_threshold,
-    very_high_residual_acf = max_abs_residual_acf >= 0.80,
-    large_segment_mean_shift = max_segment_mean_shift_sd >= 2,
-    extreme_harmonic_amplitude = harmonic_peak_trough_ratio >= 10,
-    diagnostic_refit_failed = !diagnostic_refit_converged,
-    max_abs_pearson_residual, max_abs_pearson_month,
-    max_abs_residual_acf, max_abs_residual_acf_lag,
-    max_cooks_distance, max_cooks_month,
-    max_segment_mean_shift_sd, segment_shift_after_month,
-    observed_fitted_log_rate_r2, harmonic_peak_trough_ratio,
-    diagnostic_stl_seasonal_strength, diagnostic_stl_trend_strength
-  )]
-  diagnostic_review_flags[, any_exception :=
-    upper_tail_influence | very_high_residual_acf | large_segment_mean_shift |
-      extreme_harmonic_amplitude | diagnostic_refit_failed]
-  setorder(diagnostic_review_flags, -any_exception, level, series_code)
+  diagnostic_review_flags <- diagnostic_selection %>%
+    left_join(cook_review_thresholds, by = "level") %>% # attach influence thresholds
+    transmute(                            # derive focused review flags
+      level, series_code, series_name, inference_scope, selection_reason,
+      seasonality_q_bh, seasonality_detected,
+      upper_tail_influence = max_cooks_distance >= cook_distance_review_threshold,
+      cook_distance_review_threshold,
+      very_high_residual_acf = max_abs_residual_acf >= 0.80,
+      large_segment_mean_shift = max_segment_mean_shift_sd >= 2,
+      extreme_harmonic_amplitude = harmonic_peak_trough_ratio >= 10,
+      diagnostic_refit_failed = !diagnostic_refit_converged,
+      max_abs_pearson_residual, max_abs_pearson_month,
+      max_abs_residual_acf, max_abs_residual_acf_lag,
+      max_cooks_distance, max_cooks_month,
+      max_segment_mean_shift_sd, segment_shift_after_month,
+      observed_fitted_log_rate_r2, harmonic_peak_trough_ratio,
+      diagnostic_stl_seasonal_strength, diagnostic_stl_trend_strength
+    ) %>%
+    mutate(                               # combine individual exception flags
+      any_exception = upper_tail_influence | very_high_residual_acf |
+        large_segment_mean_shift | extreme_harmonic_amplitude |
+        diagnostic_refit_failed
+    ) %>%
+    arrange(desc(any_exception), level, series_code) # prioritise exceptions
 
   ## 04.5 Reconcile the sequential cohort flow -------------------------------
   make_cohort_flow <- function(eligibility, screen, results, id_col, level_name) {
-    tab <- as.data.table(copy(eligibility))
-    tab[, series_code := as.character(get(id_col))]
+    tab <- eligibility %>%
+      as_tibble() %>%                     # standardise the eligibility table
+      mutate(series_code = as.character(.data[[id_col]])) # expose a shared identifier
     observed_items <- sum(tab$total_items)
     screen_codes <- as.character(screen[[id_col]])
     complete_codes <- as.character(screen[[id_col]][screen$converged])
@@ -547,7 +597,7 @@ run_diagnostics <- function(state) {
     row_for <- function(step_order, step, rule_type, codes, notes) {
       codes <- unique(as.character(codes))
       included_items <- sum(tab$total_items[tab$series_code %in% codes])
-      data.table(
+      tibble(
         level = level_name,
         inference_scope = if (level_name == "class") {
           "primary_inferential"
@@ -562,7 +612,7 @@ run_diagnostics <- function(state) {
         notes
       )
     }
-    rbindlist(list(
+    bind_rows(list( # combine tables by rows
       row_for(1L, "observed_after_chapter_restriction", "starting_universe",
               tab$series_code,
               "Series accounting begins after restriction to BNF chapters 01-14."),
@@ -590,44 +640,51 @@ run_diagnostics <- function(state) {
       row_for(9L, "meaningful_descriptive_classification", "analysis_result",
               meaningful_codes,
               "Detected series also meeting the amplitude and STL rules.")
-    ), use.names = TRUE)
+    ))
   }
-  cohort_flow <- rbindlist(list(
+  cohort_flow <- bind_rows(list( # combine rows
     make_cohort_flow(elig_class, screen_class, results_class,
                      "bnf_class_code", "class"),
     make_cohort_flow(elig_drug, screen_drug, results_drug,
                      "bnf_drug_code", "drug")
-  ), use.names = TRUE)
+  ))
 
   # Count overlaps between the two eligibility rules without double-counting.
   make_exclusion_overlap <- function(eligibility, level_name) {
-    as.data.table(copy(eligibility))[, .(
-      n_series = .N,
-      total_items = sum(total_items)
-    ), by = .(rule_every_month, rule_min_volume)][, `:=`(
-      level = level_name,
-      status = fifelse(
-        rule_every_month & rule_min_volume, "eligible",
-        fifelse(!rule_every_month & !rule_min_volume,
-                "failed both rules",
-                fifelse(!rule_every_month, "failed monthly coverage only",
-                        "failed annual volume only"))
+    eligibility %>%
+      as_tibble() %>%                     # standardise the eligibility table
+      group_by(rule_every_month, rule_min_volume) %>% # group rule combinations
+      summarise(                          # count series and items per combination
+        n_series = n(),
+        total_items = sum(total_items),
+        .groups = "drop"
+      ) %>%
+      mutate(                             # label the joint eligibility status
+        level = level_name,
+        status = case_when(
+          rule_every_month & rule_min_volume ~ "eligible",
+          !rule_every_month & !rule_min_volume ~ "failed both rules",
+          !rule_every_month ~ "failed monthly coverage only",
+          TRUE ~ "failed annual volume only"
+        )
       )
-    )]
   }
-  exclusion_overlap_summary <- rbindlist(list(
+  exclusion_overlap_summary <- bind_rows(list( # combine rows
     make_exclusion_overlap(elig_class, "class"),
     make_exclusion_overlap(elig_drug, "drug")
-  ), use.names = TRUE)
-  exclusion_overlap_summary[, item_share_within_level :=
-    total_items / sum(total_items), by = level]
-  setcolorder(exclusion_overlap_summary,
-              c("level", "status", "rule_every_month", "rule_min_volume",
-                "n_series", "total_items", "item_share_within_level"))
-  setorder(exclusion_overlap_summary, level, -rule_every_month, -rule_min_volume)
+  )) %>%
+    group_by(level) %>%                    # calculate shares within analysis level
+    mutate(item_share_within_level = total_items / sum(total_items)) %>% # derive volume share
+    ungroup() %>%                          # return to one summary table
+    select(                               # set the released column order
+      level, status, rule_every_month, rule_min_volume,
+      n_series, total_items, item_share_within_level
+    ) %>%
+    arrange(level, desc(rule_every_month), desc(rule_min_volume)) # retain stable order
 
-  epd_main <- epd_file_qc[analytical_role == "main_2022_2025"]
-  source_scope_flow <- data.table(
+  epd_main <- epd_file_qc %>%
+    filter(analytical_role == "main_2022_2025") # retain primary-window sources
+  source_scope_flow <- tibble(
     step_order = 1:3,
     step = c("raw_EPD_source", "retained_BNF_chapters_01_14",
              "removed_outside_BNF_chapters_01_14"),
@@ -642,24 +699,30 @@ run_diagnostics <- function(state) {
       sum(epd_main$removed_chapter_items)
     )
   )
-  source_scope_flow[, item_share_of_raw := n_items / n_items[step_order == 1L]]
-  source_scope_flow[, notes := c(
-    "Forty-eight monthly EPD archives in the primary 2022-2025 window.",
-    "Starting universe for class/drug series accounting.",
-    "Outside the declared medicines scope; not treated as missing data."
-  )]
+  source_scope_flow <- source_scope_flow %>%
+    mutate(                               # add shares and interpretation
+      item_share_of_raw = n_items / n_items[step_order == 1L],
+      notes = c(
+        "Forty-eight monthly EPD archives in the primary 2022-2025 window.",
+        "Starting universe for class/drug series accounting.",
+        "Outside the declared medicines scope; not treated as missing data."
+      )
+    )
 
   add_stage6_check(
     "cohort_flow_reconciles",
-    identical(cohort_flow[level == "class", n_series],
+    identical(cohort_flow %>% filter(level == "class") %>% pull(n_series), # filter rows; extract column
               c(344L, 236L, 220L, 220L, 220L, 220L, 220L, 125L, 30L)) &&
-      identical(cohort_flow[level == "drug", n_series],
+      identical(cohort_flow %>% filter(level == "drug") %>% pull(n_series), # filter rows; extract column
                 c(2155L, 1194L, 975L, 974L, 974L, 974L, 974L, 391L, 88L)) &&
-      sum(exclusion_overlap_summary[level == "class", n_series]) == 344L &&
-      sum(exclusion_overlap_summary[level == "drug", n_series]) == 2155L,
+      (exclusion_overlap_summary %>% filter(level == "class") %>% summarise(n = sum(n_series)) %>% pull(n)) == 344L && # filter rows; summarise groups; extract column
+      (exclusion_overlap_summary %>% filter(level == "drug") %>% summarise(n = sum(n_series)) %>% pull(n)) == 2155L, # filter rows; summarise groups; extract column
     "344/220/125/30 classes and 2155/974/391/88 drugs reconcile",
-    paste(cohort_flow[step_order %in% c(1L, 4L, 8L, 9L),
-                      paste(level, step, n_series, sep = "=")], collapse = "; ")
+    cohort_flow %>%
+      filter(step_order %in% c(1L, 4L, 8L, 9L)) %>% # retain headline flow steps
+      transmute(label = paste(level, step, n_series, sep = "=")) %>% # format each count
+      pull(label) %>% # extract the stated column
+      paste(collapse = "; ")
   )
   add_stage6_check(
     "source_scope_reconciles",
@@ -675,51 +738,53 @@ run_diagnostics <- function(state) {
             format(source_scope_flow$n_items[3], scientific = FALSE))
   )
 
-  list_size_main <- list_size_source_qc[analytical_role == "main_2022_2025"]
+  list_size_main <- list_size_source_qc %>%
+    filter(analytical_role == "main_2022_2025") # retain primary-window denominators
   ## 04.6 Account for missing, invalid, and unmatched analytical values --------
-  invalid_epd_items <- epd_main[, sum(
-    missing_items_rows + nonnumeric_items_rows + negative_items_rows +
-      noninteger_items_rows
-  )]
-  missing_epd_keys <- epd_main[, sum(
-    month_mismatch_rows + missing_practice_rows + missing_presentation_rows
-  )]
-  invalid_list_size <- list_size_main[, sum(
-    missing_patient_counts + nonnumeric_patient_counts +
-      negative_patient_counts + noninteger_patient_counts
-  )]
-  missing_model_inputs_class <- class_monthly_elig |>
-    group_by(bnf_class_code) |>
-    summarise(bad = n_distinct(year_month) != 48L || anyNA(items), .groups = "drop") |>
-    summarise(n = sum(bad)) |>
-    pull(n)
-  missing_model_inputs_drug <- drug_monthly_elig |>
-    group_by(bnf_drug_code) |>
-    summarise(bad = n_distinct(year_month) != 48L || anyNA(items), .groups = "drop") |>
-    summarise(n = sum(bad)) |>
-    pull(n)
+  invalid_epd_items <- epd_main %>%
+    summarise(n = sum(missing_items_rows + nonnumeric_items_rows + # reduce groups to summary values
+                        negative_items_rows + noninteger_items_rows)) %>% # total invalid items
+    pull(n) # extract the stated column
+  missing_epd_keys <- epd_main %>%
+    summarise(n = sum(month_mismatch_rows + missing_practice_rows + # reduce groups to summary values
+                        missing_presentation_rows)) %>% # total invalid keys
+    pull(n) # extract the stated column
+  invalid_list_size <- list_size_main %>%
+    summarise(n = sum(missing_patient_counts + nonnumeric_patient_counts + # reduce groups to summary values
+                        negative_patient_counts + noninteger_patient_counts)) %>% # total invalid denominators
+    pull(n) # extract the stated column
+  missing_model_inputs_class <- class_monthly_elig %>%
+    group_by(bnf_class_code) %>% # define groups for the next step
+    summarise(bad = n_distinct(year_month) != 48L || anyNA(items), .groups = "drop") %>% # reduce groups to summary values
+    summarise(n = sum(bad)) %>% # reduce groups to summary values
+    pull(n) # extract the stated column
+  missing_model_inputs_drug <- drug_monthly_elig %>%
+    group_by(bnf_drug_code) %>% # define groups for the next step
+    summarise(bad = n_distinct(year_month) != 48L || anyNA(items), .groups = "drop") %>% # reduce groups to summary values
+    summarise(n = sum(bad)) %>% # reduce groups to summary values
+    pull(n) # extract the stated column
 
-  missingness_summary <- rbindlist(list(
-    data.table(
+  missingness_summary <- bind_rows(list( # combine rows
+    tibble(
       stage = "raw_EPD_binding", variable_or_check = "required month/practice/presentation keys",
       n_missing_or_invalid = missing_epd_keys, denominator = sum(epd_main$raw_row_count),
       handling = "Required analytical keys; zero required for release.",
       affects_analysis = missing_epd_keys > 0
     ),
-    data.table(
+    tibble(
       stage = "raw_EPD_binding", variable_or_check = "ITEMS missing/nonnumeric/negative/noninteger",
       n_missing_or_invalid = invalid_epd_items, denominator = sum(epd_main$raw_row_count),
       handling = "Invalid item values would stop the pipeline.",
       affects_analysis = invalid_epd_items > 0
     ),
-    data.table(
+    tibble(
       stage = "raw_EPD_binding", variable_or_check = "SNOMED code missing",
       n_missing_or_invalid = sum(epd_main$missing_snomed_rows),
       denominator = sum(epd_main$raw_row_count),
       handling = "Retained: SNOMED is neither an analytical key nor an analysis variable.",
       affects_analysis = FALSE
     ),
-    data.table(
+    tibble(
       stage = "descriptor_lookup", variable_or_check = "May-2025 BNF class descriptor unmatched",
       n_missing_or_invalid = sum(epd_main$unmatched_lookup_raw_rows),
       denominator = sum(epd_main$retained_chapter_01_14_rows),
@@ -727,21 +792,21 @@ run_diagnostics <- function(state) {
                         " items have missing lookup-derived descriptors."),
       affects_analysis = FALSE
     ),
-    data.table(
+    tibble(
       stage = "list_size_binding", variable_or_check = "practice code missing",
       n_missing_or_invalid = sum(list_size_main$missing_practice_codes),
       denominator = sum(list_size_main$source_rows),
       handling = "Required source key; zero required for release.",
       affects_analysis = sum(list_size_main$missing_practice_codes) > 0
     ),
-    data.table(
+    tibble(
       stage = "list_size_binding", variable_or_check = "patient count missing/invalid",
       n_missing_or_invalid = invalid_list_size,
       denominator = sum(list_size_main$source_rows),
       handling = "Invalid denominator values would stop the pipeline.",
       affects_analysis = invalid_list_size > 0
     ),
-    data.table(
+    tibble(
       stage = "monthly_aggregate", variable_or_check = "duplicate class/drug month keys",
       n_missing_or_invalid = sum(epd_main$drug_month_duplicate_rows) +
         sum(epd_main$class_month_duplicate_rows),
@@ -749,7 +814,7 @@ run_diagnostics <- function(state) {
       handling = "National aggregates must be unique by series and month.",
       affects_analysis = FALSE
     ),
-    data.table(
+    tibble(
       stage = "monthly_covariates", variable_or_check = "missing/nonfinite list size or primary offset",
       n_missing_or_invalid = sum(!is.finite(covar$list_size)) +
         sum(!is.finite(covar$offset_log_patient_days)),
@@ -757,14 +822,14 @@ run_diagnostics <- function(state) {
       handling = "Every primary month requires both values.",
       affects_analysis = FALSE
     ),
-    data.table(
+    tibble(
       stage = "model_input", variable_or_check = "eligible series lacking 48 complete item months",
       n_missing_or_invalid = missing_model_inputs_class + missing_model_inputs_drug,
       denominator = nrow(screen_class) + nrow(screen_drug),
       handling = "Eligibility and fit functions independently require 48 months.",
       affects_analysis = FALSE
     ),
-    data.table(
+    tibble(
       stage = "model_output", variable_or_check = "missing p/q value or non-converged model",
       n_missing_or_invalid = sum(!screen_class$converged | is.na(screen_class$p_value) |
                                    is.na(screen_class$class_q_bh)) +
@@ -774,7 +839,7 @@ run_diagnostics <- function(state) {
       handling = "Retained explicitly in screening and model-failure outputs.",
       affects_analysis = FALSE
     ),
-    data.table(
+    tibble(
       stage = "characterisation", variable_or_check = "missing amplitude CI or STL strength",
       n_missing_or_invalid = sum(!is.finite(char_class$ptr_lci) |
                                    !is.finite(char_class$ptr_uci) |
@@ -786,9 +851,9 @@ run_diagnostics <- function(state) {
       handling = "A failed uncertainty or STL calculation remains visible and cannot be meaningful.",
       affects_analysis = FALSE
     )
-  ), use.names = TRUE)
+  ))
 
-  warning_summary <- data.table(
+  warning_summary <- tibble(
     category = c(
       "captured_runtime_warning_messages", "class_model_failures",
       "drug_model_failures", "class_negative_binomial_fallbacks",
@@ -819,12 +884,12 @@ run_diagnostics <- function(state) {
   )
   add_stage6_check(
     "missingness_and_warnings_accounted",
-    all(missingness_summary[affects_analysis == TRUE, n_missing_or_invalid] == 0) &&
-      warning_summary[category == "class_model_failures", n] == 0L &&
-      warning_summary[category == "drug_model_failures", n] == 0L &&
-      warning_summary[category == "failed_amplitude_confidence_intervals", n] == 0L &&
-      warning_summary[category == "missing_STL_strength_values", n] == 0L &&
-      warning_summary[category == "drug_negative_binomial_fallbacks", n] == 2L,
+    all((missingness_summary %>% filter(affects_analysis) %>% pull(n_missing_or_invalid)) == 0) && # filter rows; extract column
+      (warning_summary %>% filter(category == "class_model_failures") %>% pull(n)) == 0L && # filter rows; extract column
+      (warning_summary %>% filter(category == "drug_model_failures") %>% pull(n)) == 0L && # filter rows; extract column
+      (warning_summary %>% filter(category == "failed_amplitude_confidence_intervals") %>% pull(n)) == 0L && # filter rows; extract column
+      (warning_summary %>% filter(category == "missing_STL_strength_values") %>% pull(n)) == 0L && # filter rows; extract column
+      (warning_summary %>% filter(category == "drug_negative_binomial_fallbacks") %>% pull(n)) == 2L, # filter rows; extract column
     "no missing required analytical values/failures; two documented drug NB fallbacks",
     paste(warning_summary$category, warning_summary$n, sep = "=", collapse = "; ")
   )
@@ -855,10 +920,12 @@ run_diagnostics <- function(state) {
     paste(sum(file.exists(file.path(stage6_dir, output_files))), "present")
   )
 
-  stage6_qc_summary <- rbindlist(stage6_checks)
+  stage6_qc_summary <- bind_rows(stage6_checks) # combine all diagnostic gates
   atomic_fwrite(stage6_qc_summary, file.path(stage6_dir, "stage6_qc_summary.csv"))
   if (!all(stage6_qc_summary$pass)) {
-    failed <- stage6_qc_summary[!pass, check_id]
+    failed <- stage6_qc_summary %>%
+      filter(!pass) %>%                    # retain failed gates
+      pull(check_id) # extract the stated column
     stop("Stage 6 completion gate failed: ", paste(failed, collapse = ", "),
          ". See ", file.path(stage6_dir, "stage6_qc_summary.csv"), ".")
   }
@@ -872,14 +939,14 @@ run_diagnostics <- function(state) {
       stop("Could not seal Stage 6 snapshot file: ", relative_path)
     }
   }
-  stage6_manifest <- data.table(
+  stage6_manifest <- tibble(
     relative_path = output_files,
     bytes = as.numeric(file.info(file.path(stage6_snapshot_dir, output_files))$size),
     sha256 = vapply(file.path(stage6_snapshot_dir, output_files),
                     sha256_file, character(1))
   )
   atomic_fwrite(stage6_manifest, file.path(stage6_dir, "stage6_snapshot_manifest.csv"))
-  stage6_completion <- data.table(
+  stage6_completion <- tibble(
     stage = "stage6", status = "PASS",
     completed_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"),
     checks_passed = sum(stage6_qc_summary$pass),
