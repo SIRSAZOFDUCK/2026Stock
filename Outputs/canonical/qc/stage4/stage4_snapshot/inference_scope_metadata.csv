@@ -1,0 +1,4 @@
+level,analysis_role,multiplicity_family,family_size,adjusted_value,discovery_flag,interpretation
+class,primary_inferential,all_eligible_classes,220,class_q_bh,class_significant,BH FDR 5% within the complete eligible-class family.
+drug,secondary_exploratory,all_eligible_drugs,974,drug_all_q_bh,drug_significant,BH FDR 5% within the complete eligible-drug family; hypothesis-generating.
+hierarchy,not_applicable,no_joint_hierarchical_family,,,,Neither family is claimed to provide 5% FDR control across the whole hierarchy.

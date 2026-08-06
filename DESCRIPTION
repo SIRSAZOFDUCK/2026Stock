@@ -1,0 +1,29 @@
+Package: stockSeasonalityAnalysis
+Type: Project
+Title: Seasonality in Primary Care Prescribing in England
+Version: 0.0.0.9000
+Description: Reproducible project environment metadata for the one-off
+    prescribing seasonality analysis. This is not an installable software
+    package; Imports is the explicit list of direct analysis dependencies.
+Encoding: UTF-8
+Depends:
+    R (= 4.6.1)
+Imports:
+    AER,
+    car,
+    conflicted,
+    data.table,
+    dplyr,
+    ggplot2,
+    ggrepel,
+    jsonlite,
+    lmtest,
+    lubridate,
+    MASS,
+    purrr,
+    readr,
+    renv,
+    sandwich,
+    stringr,
+    tibble,
+    tidyr

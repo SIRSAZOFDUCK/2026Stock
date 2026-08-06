@@ -1,0 +1,89 @@
+BNF class code,BNF class,BNF drug code,Drug (chemical substance),Peak-to-trough ratio (95% CI),Peak month,Trough month,Seasonal shape,Seasonal strength,Parent class significant,Drug q (BH; all eligible drugs)
+05.03.04,Influenza,0503040B0,Oseltamivir phosphate,158.78 (59.32–440.28),Jan,Aug,Unimodal (non-sinusoidal),0.71,Yes,<0.001
+14.04.00,Vaccines and antisera,1404000H0,Influenza,71.47 (45.12–123.98),Nov,Jun,Unimodal (non-sinusoidal),0.88,Yes,<0.001
+13.08.01,Sunscreening preparations,130801000,Other sunscreening preparations,2.69 (2.48–2.92),Jun,Jan,Unimodal (non-sinusoidal),0.90,Yes,<0.001
+11.04.02,Other anti-inflammatory preparations,1104020W0,Azelastine hydrochloride,2.65 (2.50–2.98),Jun,Jan,Bimodal,0.96,Yes,<0.001
+11.04.02,Other anti-inflammatory preparations,1104020AC,Epinastine hydrochloride,2.43 (2.28–2.64),Jun,Dec,Unimodal (non-sinusoidal),0.94,Yes,<0.001
+05.01.01,Penicillins,0501013B0,Amoxicillin,2.35 (2.02–2.73),Dec,Aug,Unimodal (non-sinusoidal),0.84,Yes,<0.001
+05.01.05,Macrolides,0501050H0,Erythromycin ethylsuccinate,2.29 (1.90–2.81),Dec,Aug,Bimodal,0.70,Yes,<0.001
+11.04.02,Other anti-inflammatory preparations,1104020T0,Sodium cromoglicate,2.27 (2.17–2.43),Jun,Jan,Unimodal (non-sinusoidal),0.96,Yes,<0.001
+03.09.02,Expectorant and demulcent cough preparations,0309020D0,Simple,2.15 (1.96–2.36),Dec,Aug,Unimodal (non-sinusoidal),0.89,Yes,<0.001
+03.09.02,Expectorant and demulcent cough preparations,0309020G0,Guaifenesin,1.94 (1.77–2.18),Dec,Jul,Unimodal (non-sinusoidal),0.88,Yes,<0.001
+09.02.01,Oral preparation for fluid and electrolyte imbalance,0902011U0,Potassium chloride,1.86 (1.75–2.01),Aug,Dec,Unimodal (non-sinusoidal),0.89,Yes,<0.001
+06.04.01,Female sex hormones and their modulators,0604012P0,Norethisterone,1.85 (1.74–1.96),Jul,Dec,Unimodal (non-sinusoidal),0.90,Yes,<0.001
+11.04.02,Other anti-inflammatory preparations,1104020Z0,Olopatadine,1.82 (1.74–1.94),Jun,Jan,Unimodal (non-sinusoidal),0.95,Yes,<0.001
+05.01.03,Tetracyclines,0501030I0,Doxycycline hyclate,1.81 (1.61–2.07),Dec,Aug,Unimodal (non-sinusoidal),0.84,Yes,<0.001
+11.04.02,Other anti-inflammatory preparations,1104020M0,Lodoxamide trometamol,1.70 (1.58–1.85),Jun,Jan,Unimodal (non-sinusoidal),0.91,Yes,<0.001
+11.03.01,Antibacterials,1103010C0,Chloramphenicol,1.68 (1.47–1.94),Feb,Sep,Unimodal (non-sinusoidal),0.80,Yes,<0.001
+12.02.01,Drugs used in nasal allergy,1202010A0,Azelastine hydrochloride,1.67 (1.54–1.85),Jun,Feb,Bimodal,0.87,Yes,<0.001
+05.01.01,Penicillins,0501011P0,Phenoxymethylpenicillin (Penicillin V),1.64 (1.43–1.96),Jan,Aug,Unimodal (non-sinusoidal),0.76,Yes,<0.001
+06.04.01,Female sex hormones and their modulators,0604012M0,Medroxyprogesterone acetate,1.58 (1.32–1.97),Jul,Nov,Unimodal (non-sinusoidal),0.57,Yes,<0.001
+03.04.03,Allergic emergencies,0304030C0,Adrenaline,1.58 (1.42–1.80),Aug,Dec,Bimodal,0.83,Yes,<0.001
+03.10.00,Systemic nasal decongestants,0310000N0,Pseudoephedrine hydrochloride,1.55 (1.43–1.71),Dec,Jul,Unimodal,0.71,Yes,<0.001
+11.04.02,Other anti-inflammatory preparations,1104020Y0,Ketotifen fumarate,1.52 (1.44–1.65),Jun,Jan,Unimodal (non-sinusoidal),0.89,Yes,<0.001
+13.10.04,Parasiticidal preparations,1310040Q0,Permethrin,1.51 (1.42–1.65),Nov,Jul,Unimodal (non-sinusoidal),0.86,Yes,<0.001
+05.01.05,Macrolides,0501050B0,Clarithromycin,1.50 (1.34–1.72),Dec,Aug,Unimodal (non-sinusoidal),0.76,Yes,<0.001
+03.09.01,Cough suppressants,0309010C0,Codeine phosphate,1.49 (1.42–1.56),Dec,Aug,Unimodal (non-sinusoidal),0.87,Yes,<0.001
+03.04.01,Antihistamines,0304010E0,Fexofenadine hydrochloride,1.47 (1.43–1.52),Jun,Jan,Unimodal (non-sinusoidal),0.93,Yes,<0.001
+12.02.03,Nasal preparations for infection,1202030S0,Neomycin sulfate,1.44 (1.37–1.57),May,Sep,Unimodal (non-sinusoidal),0.86,Yes,<0.001
+12.03.01,Drugs for oral ulceration and inflammation,1203010E0,Benzydamine hydrochloride,1.44 (1.32–1.58),Dec,Aug,Unimodal (non-sinusoidal),0.78,Yes,<0.001
+12.02.01,Drugs used in nasal allergy,1202010T0,Triamcinolone acetonide,1.42 (1.26–1.95),Jun,Nov,Unimodal (non-sinusoidal),0.51,Yes,<0.001
+03.04.02,Allergen immunotherapy,0304020AB,Timothy grass pollen allergen extract,1.39 (1.32–1.49),May,Nov,Unimodal,0.78,Yes,<0.001
+13.12.00,Antiperspirants,1312000C0,Aluminium chloride,1.39 (1.35–1.46),Jul,Dec,Unimodal (non-sinusoidal),0.86,Yes,<0.001
+13.07.00,Preparations for warts and calluses,1307000M0,Salicylic acid,1.39 (1.31–1.48),Aug,Dec,Unimodal (non-sinusoidal),0.89,Yes,<0.001
+12.02.02,Topical nasal decongestants,1202020P0,Xylometazoline hydrochloride,1.39 (1.32–1.46),Jan,Aug,Unimodal (non-sinusoidal),0.93,Yes,<0.001
+03.04.01,Antihistamines,0304010A0,Acrivastine,1.38 (1.35–1.41),Jun,Jan,Unimodal (non-sinusoidal),0.93,Yes,<0.001
+03.04.01,Antihistamines,0304010AB,Desloratadine,1.36 (1.33–1.40),Jun,Jan,Unimodal (non-sinusoidal),0.91,Yes,<0.001
+06.03.02,Glucocorticoid therapy,0603020T0,Prednisolone,1.36 (1.29–1.43),Dec,Aug,Unimodal (non-sinusoidal),0.84,Yes,<0.001
+13.08.01,Sunscreening preparations,1308010W0,Diclofenac sodium,1.35 (1.31–1.42),Aug,Jan,Unimodal (non-sinusoidal),0.86,Yes,<0.001
+11.03.01,Antibacterials,1103010G0,Gentamicin sulfate,1.35 (1.29–1.41),Sep,May,Bimodal,0.83,Yes,<0.001
+06.03.02,Glucocorticoid therapy,0603020M0,Hydrocortisone sodium succinate,1.35 (1.23–2.18),Jul,Dec,Unimodal (non-sinusoidal),0.53,Yes,<0.001
+12.01.01,Otitis externa,1201010AE,Ciprofloxain/dexameth,1.33 (1.26–1.99),Sep,May,Unimodal (non-sinusoidal),0.67,Yes,<0.001
+13.10.01,Antibacterial preparations,1310012K0,Metronidazole,1.33 (1.30–1.36),Apr,Nov,Unimodal (non-sinusoidal),0.93,Yes,<0.001
+13.10.04,Parasiticidal preparations,1310040V0,Dimeticone (Parasiticidal),1.32 (1.21–1.49),Oct,May,Unimodal,0.51,Yes,<0.001
+03.04.01,Antihistamines,0304010AF,Bilastine,1.32 (1.27–1.40),Jun,Nov,Unimodal (non-sinusoidal),0.82,Yes,<0.001
+12.01.01,Otitis externa,1201010G0,Hydrocortisone acetate,1.32 (1.24–1.41),Sep,May,Bimodal,0.65,Yes,<0.001
+13.06.03,Topical preparation for rosacea,1306030B0,Ivermectin,1.29 (1.27–1.34),Apr,Dec,Unimodal (non-sinusoidal),0.87,Yes,<0.001
+12.02.01,Drugs used in nasal allergy,1202010C0,Beclometasone dipropionate,1.29 (1.24–1.35),Jun,Oct,Bimodal,0.89,Yes,<0.001
+05.01.03,Tetracyclines,0501030Z0,Doxycycline monohydrate,1.29 (1.20–1.39),Dec,Aug,Unimodal (non-sinusoidal),0.64,Yes,<0.001
+03.04.01,Antihistamines,0304010D0,Loratadine,1.29 (1.27–1.30),Jun,Jan,Unimodal (non-sinusoidal),0.90,Yes,<0.001
+13.10.02,Antifungal preparations,1310020A0,Amorolfine hydrochloride,1.28 (1.26–1.32),Jul,Dec,Unimodal (non-sinusoidal),0.85,Yes,<0.001
+12.03.03,Lozenges and sprays,1203030B0,Benzocaine,1.28 (1.18–1.46),Feb,Jun,Unimodal,0.61,Yes,<0.001
+06.03.02,Glucocorticoid therapy,0603020G0,Dexamethasone,1.28 (1.21–1.41),Nov,Jul,Bimodal,0.72,Yes,<0.001
+03.07.00,Mucolytics,0307000Q0,Erdosteine,1.27 (1.22–1.35),Dec,Aug,Unimodal (non-sinusoidal),0.72,Yes,<0.001
+05.01.02,Cephalosporins and other beta-lactams,0501021A0,Cefaclor,1.27 (1.21–1.35),Dec,Aug,Bimodal,0.62,Yes,<0.001
+12.01.01,Otitis externa,1201010AC,Ciprofloxacin,1.27 (1.21–1.32),Sep,May,Bimodal,0.78,Yes,<0.001
+05.01.07,Some other antibacterials,0501070U0,Vancomycin hydrochloride,1.27 (1.21–1.35),Sep,Jan,Unimodal (non-sinusoidal),0.76,Yes,<0.001
+12.02.01,Drugs used in nasal allergy,1202010Y0,Fluticasone propionate/azelastine hydrochloride (Nasal),1.26 (1.23–1.32),Jun,Oct,Bimodal,0.86,Yes,<0.001
+03.04.01,Antihistamines,0304010AC,Levocetirizine,1.26 (1.21–1.32),Jun,Jan,Unimodal (non-sinusoidal),0.65,Yes,<0.001
+03.04.01,Antihistamines,0304010I0,Cetirizine hydrochloride,1.25 (1.23–1.28),Jun,Jan,Unimodal (non-sinusoidal),0.86,Yes,<0.001
+10.01.04,Gout and cytotoxic induced hyperuicaemia,1001040G0,Colchicine,1.25 (1.22–1.29),Jul,Nov,Unimodal (non-sinusoidal),0.78,Yes,<0.001
+13.11.06,Oxidisers and dyes,1311060Q0,Potassium permanganate,1.25 (1.19–1.33),Aug,Jan,Unimodal,0.65,Yes,<0.001
+03.04.01,Antihistamines,0304010G0,Chlorphenamine maleate,1.24 (1.21–1.28),Jun,Oct,Bimodal,0.87,Yes,<0.001
+05.01.12,Quinolones,0501120X0,Levofloxacin,1.23 (1.19–1.28),Jan,Aug,Unimodal (non-sinusoidal),0.80,Yes,<0.001
+13.10.02,Antifungal preparations,1310020T0,Tioconazole,1.23 (1.18–1.30),Jul,Dec,Unimodal (non-sinusoidal),0.73,Yes,<0.001
+05.01.01,Penicillins,0501012G0,Flucloxacillin sodium,1.23 (1.19–1.28),Aug,Dec,Unimodal (non-sinusoidal),0.72,Yes,<0.001
+13.10.05,Preparations for minor cuts and abrasions,1310050H0,Hydrogen peroxide,1.23 (1.15–1.43),Nov,Jun,Unimodal (non-sinusoidal),0.54,No,0.0112
+13.10.02,Antifungal preparations,131002030,Terbinafine hydrochloride,1.22 (1.18–1.31),Jul,Jan,Unimodal (non-sinusoidal),0.60,Yes,<0.001
+05.05.01,Drugs for threadworms,0505010D0,Mebendazole,1.22 (1.16–1.31),Oct,Jun,Unimodal (non-sinusoidal),0.79,Yes,<0.001
+05.02.05,Other antifungals,0502050C0,Terbinafine hydrochloride,1.21 (1.17–1.25),Aug,Jan,Unimodal,0.86,Yes,<0.001
+04.02.01,Antipsychotic drugs,0402010L0,Levomepromazine hydrochloride,1.20 (1.15–1.27),Jan,Aug,Unimodal (non-sinusoidal),0.73,Yes,<0.001
+05.02.01,Triazole antifungals,0502010C0,Itraconazole,1.20 (1.15–1.28),Jul,Feb,Unimodal,0.54,Yes,<0.001
+06.01.04,Treatment of hypoglycaemia,0601040H0,Glucagon,1.20 (1.16–1.25),Jul,Dec,Unimodal (non-sinusoidal),0.83,Yes,<0.001
+12.02.03,Nasal preparations for infection,1202030R0,Mupirocin,1.19 (1.15–1.29),Apr,Sep,Unimodal (non-sinusoidal),0.60,Yes,<0.001
+13.14.00,Topical circulatory preparations,1314000H0,Heparinoid,1.18 (1.14–1.22),Jul,Dec,Unimodal (non-sinusoidal),0.77,Yes,<0.001
+13.06.02,Oral preparations for acne,1306020J0,Isotretinoin,1.18 (1.11–1.26),Mar,Sep,Unimodal (non-sinusoidal),0.65,Yes,<0.001
+04.05.01,Gastro-intestinal anti-obesity drugs,0405010P0,Orlistat,1.16 (1.13–1.21),Jul,Jan,Unimodal (non-sinusoidal),0.84,Yes,<0.001
+13.05.03,Drugs affecting the immune response,1305030B0,Pimecrolimus,1.16 (1.12–1.22),Apr,Sep,Unimodal (non-sinusoidal),0.73,Yes,<0.001
+12.01.01,Otitis externa,1201010B0,Acetic acid,1.16 (1.12–1.70),Jan,May,Unimodal (non-sinusoidal),0.50,Yes,0.00121
+12.02.01,Drugs used in nasal allergy,1202010U0,Mometasone furoate,1.16 (1.13–1.20),May,Sep,Unimodal (non-sinusoidal),0.75,Yes,<0.001
+04.10.02,Nicotine dependence,0410020B0,Nicotine,1.16 (1.12–1.22),Mar,Nov,Unimodal (non-sinusoidal),0.77,Yes,<0.001
+05.01.05,Macrolides,0501050A0,Azithromycin,1.15 (1.12–1.20),Dec,Aug,Unimodal (non-sinusoidal),0.65,Yes,<0.001
+11.03.01,Antibacterials,1103010B0,Ciprofloxacin,1.15 (1.11–1.20),Feb,May,Bimodal,0.71,Yes,<0.001
+12.01.01,Otitis externa,120101050,Dexamethasone,1.15 (1.11–1.21),Aug,May,Bimodal,0.60,Yes,<0.001
+13.02.01,Emollients,1302011L0,Light liquid paraffin,1.15 (1.12–1.18),Apr,Sep,Unimodal (non-sinusoidal),0.81,Yes,<0.001
+01.07.04,Management of anal fissures,0107040A0,Glyceryl trinitrate,1.15 (1.12–1.18),Feb,Jul,Unimodal (non-sinusoidal),0.82,Yes,<0.001
+12.02.01,Drugs used in nasal allergy,1202010I0,Budesonide,1.15 (1.13–1.18),Jun,Dec,Unimodal (non-sinusoidal),0.74,Yes,<0.001
+13.07.00,Preparations for warts and calluses,1307000Q0,Silver nitrate,1.15 (1.10–1.22),Sep,Jan,Bimodal,0.62,Yes,<0.001
+12.02.01,Drugs used in nasal allergy,1202010M0,Fluticasone propionate (Nasal),1.15 (1.11–1.19),Jun,Oct,Unimodal (non-sinusoidal),0.76,Yes,<0.001
+09.02.02,Parent prepn for fluid and electrolyte imb,0902021X0,Water for injection,1.11 (1.10–1.13),Jan,Aug,Bimodal,0.70,Yes,<0.001

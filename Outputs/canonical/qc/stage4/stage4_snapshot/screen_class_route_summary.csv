@@ -1,0 +1,4 @@
+distribution,route,n,pct
+negbin,NB-LRT,46,20.9
+poisson,HAC-Wald,165,75
+poisson,Poisson-LRT,9,4.1

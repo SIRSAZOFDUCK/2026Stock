@@ -1,0 +1,8 @@
+level,distribution,route,n,pct
+class,negbin,NB-LRT,46,20.9
+class,poisson,HAC-Wald,165,75
+class,poisson,Poisson-LRT,9,4.1
+drug,negbin,NB-LRT,208,21.4
+drug,poisson,HAC-Wald,672,69
+drug,poisson,HAC-Wald(NBfail),2,0.2
+drug,poisson,Poisson-LRT,92,9.4

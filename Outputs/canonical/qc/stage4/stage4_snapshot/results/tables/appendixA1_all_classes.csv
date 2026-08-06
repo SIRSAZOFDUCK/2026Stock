@@ -1,0 +1,126 @@
+BNF chapter,BNF class code,BNF class,Inference scope,Peak-to-trough ratio,95% CI lower,95% CI upper,Peak month,Trough month,Seasonal shape,Seasonal strength (STL),Trend strength (STL),Cross-year reproducibility,Distribution,Inference method,HAC bandwidth capped,Class q (BH; all eligible classes),Meaningful seasonality
+Infections,05.03.04,Influenza,Primary inferential,158.006,59.885,431.964,Jan,Aug,Unimodal (non-sinusoidal),0.720,0.431,0.766,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Immunological Products and Vaccines,14.04.00,Vaccines and antisera,Primary inferential,60.087,23.871,163.598,Oct,Jun,Bimodal,0.861,0.000,0.858,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Respiratory System,03.09.02,Expectorant and demulcent cough preparations,Primary inferential,2.141,1.960,2.350,Dec,Aug,Unimodal (non-sinusoidal),0.882,0.536,0.918,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Eye,11.04.02,Other anti-inflammatory preparations,Primary inferential,1.981,1.884,2.125,Jun,Jan,Unimodal (non-sinusoidal),0.962,0.206,0.971,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Infections,05.01.03,Tetracyclines,Primary inferential,1.601,1.460,1.777,Dec,Aug,Unimodal (non-sinusoidal),0.825,0.357,0.857,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Respiratory System,03.04.03,Allergic emergencies,Primary inferential,1.583,1.425,1.801,Aug,Dec,Bimodal,0.828,0.319,0.784,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Eye,11.03.01,Antibacterials,Primary inferential,1.577,1.391,1.829,Feb,Sep,Unimodal (non-sinusoidal),0.768,0.633,0.893,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Infections,05.01.01,Penicillins,Primary inferential,1.572,1.399,1.768,Dec,Aug,Unimodal (non-sinusoidal),0.767,0.565,0.833,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Respiratory System,03.09.01,Cough suppressants,Primary inferential,1.547,1.453,1.683,Dec,Aug,Unimodal (non-sinusoidal),0.814,0.896,0.747,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Respiratory System,03.10.00,Systemic nasal decongestants,Primary inferential,1.534,1.417,1.690,Dec,Jul,Unimodal,0.714,0.877,0.677,Negbin,Negative binomial (LRT),"",<0.001,Yes
+Skin,13.10.04,Parasiticidal preparations,Primary inferential,1.452,1.375,1.557,Nov,Jul,Unimodal (non-sinusoidal),0.844,0.968,0.829,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Infections,05.01.05,Macrolides,Primary inferential,1.415,1.258,1.620,Dec,Aug,Unimodal (non-sinusoidal),0.725,0.535,0.740,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+"Ear, Nose and Oropharynx",12.03.01,Drugs for oral ulceration and inflammation,Primary inferential,1.411,1.295,1.545,Dec,Aug,Unimodal (non-sinusoidal),0.775,0.094,0.812,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+"Ear, Nose and Oropharynx",12.02.03,Nasal preparations for infection,Primary inferential,1.400,1.335,1.507,May,Sep,Unimodal (non-sinusoidal),0.853,0.467,0.814,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Skin,13.12.00,Antiperspirants,Primary inferential,1.392,1.347,1.455,Jul,Dec,Unimodal (non-sinusoidal),0.861,0.013,0.851,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Skin,13.07.00,Preparations for warts and calluses,Primary inferential,1.368,1.309,1.478,Aug,Jan,Unimodal (non-sinusoidal),0.845,0.667,0.817,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Respiratory System,03.04.02,Allergen immunotherapy,Primary inferential,1.325,1.259,1.402,May,Nov,Unimodal,0.664,0.963,0.659,Poisson,Poisson (LRT),"",<0.001,Yes
+Endocrine System,06.03.02,Glucocorticoid therapy,Primary inferential,1.322,1.261,1.387,Dec,Aug,Unimodal (non-sinusoidal),0.841,0.581,0.839,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Skin,13.06.03,Topical preparation for rosacea,Primary inferential,1.321,1.290,1.377,Apr,Dec,Unimodal (non-sinusoidal),0.872,0.958,0.880,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Skin,13.08.01,Sunscreening preparations,Primary inferential,1.280,1.230,1.358,Aug,Jan,Unimodal (non-sinusoidal),0.821,0.650,0.800,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Respiratory System,03.04.01,Antihistamines,Primary inferential,1.273,1.250,1.296,Jun,Jan,Unimodal (non-sinusoidal),0.870,0.579,0.904,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Skin,13.11.06,Oxidisers and dyes,Primary inferential,1.246,1.190,1.318,Aug,Jan,Unimodal,0.663,0.937,0.591,Negbin,Negative binomial (LRT),"",<0.001,Yes
+Infections,05.05.01,Drugs for threadworms,Primary inferential,1.223,1.157,1.306,Oct,Jun,Unimodal (non-sinusoidal),0.785,0.250,0.772,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Infections,05.02.05,Other antifungals,Primary inferential,1.210,1.174,1.253,Aug,Jan,Unimodal,0.856,0.862,0.793,Negbin,Negative binomial (LRT),"",<0.001,Yes
+"Ear, Nose and Oropharynx",12.02.01,Drugs used in nasal allergy,Primary inferential,1.192,1.166,1.227,May,Oct,Unimodal (non-sinusoidal),0.798,0.236,0.820,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Skin,13.14.00,Topical circulatory preparations,Primary inferential,1.178,1.143,1.220,Jul,Dec,Unimodal (non-sinusoidal),0.770,0.726,0.726,Negbin,Negative binomial (LRT),"",<0.001,Yes
+"Ear, Nose and Oropharynx",12.01.01,Otitis externa,Primary inferential,1.173,1.139,1.223,Sep,May,Bimodal,0.715,0.613,0.692,Negbin,Negative binomial (LRT),"",<0.001,Yes
+Central Nervous System,04.10.02,Nicotine dependence,Primary inferential,1.167,1.122,1.415,Mar,Nov,Unimodal (non-sinusoidal),0.781,0.713,0.642,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Central Nervous System,04.05.01,Gastro-intestinal anti-obesity drugs,Primary inferential,1.163,1.128,1.210,Jul,Jan,Unimodal (non-sinusoidal),0.837,0.974,0.777,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Gastro-Intestinal System,01.07.04,Management of anal fissures,Primary inferential,1.148,1.122,1.179,Feb,Jul,Unimodal (non-sinusoidal),0.825,0.815,0.746,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,Yes
+Nutrition and Blood,09.11.01,Amino acids and nutritional agents,Primary inferential,4.218,2.303,11.996,Oct,Feb,Bimodal,0.002,0.705,-0.006,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Infections,05.05.06,Filaricides,Primary inferential,1.663,1.542,1.936,Jan,Aug,Unimodal (non-sinusoidal),0.357,0.977,0.456,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Nutrition and Blood,09.11.04,Digestive aids,Primary inferential,1.634,1.191,2.437,Oct,Feb,Bimodal,0.000,0.824,0.015,Poisson,Poisson + Newey–West HAC (Wald),No,0.0413,No
+Eye,11.08.03,Other eye preparations,Primary inferential,1.233,1.123,1.774,Jun,Feb,Bimodal,0.020,0.688,0.090,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.0015,No
+"Ear, Nose and Oropharynx",12.03.03,Lozenges and sprays,Primary inferential,1.165,1.126,1.224,Jan,Jul,Unimodal,0.189,0.026,0.346,Poisson,Poisson (LRT),"",<0.001,No
+Infections,05.01.06,Clindamycin and lincomycin,Primary inferential,1.126,1.096,1.163,Aug,Dec,Unimodal (non-sinusoidal),0.700,0.921,0.625,Negbin,Negative binomial (LRT),"",<0.001,No
+Respiratory System,03.01.01,Adrenoceptor agonists,Primary inferential,1.124,1.094,1.154,Dec,Aug,Bimodal,0.696,0.945,0.606,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Infections,05.01.12,Quinolones,Primary inferential,1.116,1.093,1.146,Dec,Jun,Unimodal,0.561,0.945,0.628,Negbin,Negative binomial (LRT),"",<0.001,No
+Infections,05.01.13,Urinary-tract infections,Primary inferential,1.114,1.085,1.150,Sep,May,Unimodal (non-sinusoidal),0.566,0.358,0.549,Negbin,Negative binomial (LRT),"",<0.001,No
+Musculoskeletal and Joint Diseases,10.01.02,Corticosteroids,Primary inferential,1.108,1.083,1.167,May,Jan,Unimodal (non-sinusoidal),0.701,0.868,0.723,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+"Ear, Nose and Oropharynx",12.01.03,Removal of ear wax and other substances,Primary inferential,1.107,1.073,1.148,Mar,Nov,Bimodal,0.652,0.924,0.536,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Nutrition and Blood,09.02.01,Oral preparation for fluid and electrolyte imbalance,Primary inferential,1.105,1.079,1.142,Jul,Dec,Unimodal (non-sinusoidal),0.626,0.863,0.475,Negbin,Negative binomial (LRT),"",<0.001,No
+Skin,13.05.03,Drugs affecting the immune response,Primary inferential,1.104,1.085,1.137,Apr,Sep,Unimodal (non-sinusoidal),0.695,0.980,0.575,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Nutrition and Blood,09.02.02,Parent prepn for fluid and electrolyte imb,Primary inferential,1.103,1.083,1.135,Dec,Aug,Bimodal,0.681,0.454,0.566,Negbin,Negative binomial (LRT),"",<0.001,No
+Infections,05.01.02,Cephalosporins and other beta-lactams,Primary inferential,1.097,1.069,1.132,Dec,May,Unimodal,0.366,0.299,0.427,Negbin,Negative binomial (LRT),"",<0.001,No
+Skin,13.10.02,Antifungal preparations,Primary inferential,1.095,1.075,1.185,Aug,Dec,Bimodal,0.585,0.883,0.510,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Nutrition and Blood,09.01.03,"Hypoplastic,haemolytic and renal anaemias",Primary inferential,1.091,1.054,1.148,Jul,Apr,Bimodal,0.445,0.554,0.354,Poisson,Poisson (LRT),"",0.00398,No
+Skin,13.04.00,Topical corticosteroids,Primary inferential,1.090,1.061,1.134,Mar,Oct,Unimodal,0.660,0.199,0.450,Negbin,Negative binomial (LRT),"",<0.001,No
+Endocrine System,06.01.04,Treatment of hypoglycaemia,Primary inferential,1.090,1.075,1.110,Jul,Dec,Unimodal (non-sinusoidal),0.558,0.753,0.579,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+"Obstetrics, Gynaecology and Urinary-Tract Disorders",07.02.02,Vaginal and vulval infections,Primary inferential,1.085,1.045,1.138,Sep,May,Bimodal,0.506,0.252,0.531,Poisson,Poisson + Newey–West HAC (Wald),No,0.00509,No
+Skin,13.10.03,Antiviral preparations,Primary inferential,1.084,1.066,1.107,Dec,Aug,Unimodal (non-sinusoidal),0.485,0.873,0.356,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+"Ear, Nose and Oropharynx",12.02.02,Topical nasal decongestants,Primary inferential,1.080,1.054,1.122,Jan,Sep,Unimodal,0.256,0.125,0.262,Negbin,Negative binomial (LRT),"",0.0014,No
+Skin,13.05.02,Preparations for psoriasis,Primary inferential,1.078,1.068,1.096,Apr,Oct,Unimodal (non-sinusoidal),0.567,0.000,0.526,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Skin,13.06.02,Oral preparations for acne,Primary inferential,1.077,1.054,1.117,Mar,Oct,Unimodal,0.463,0.921,0.429,Negbin,Negative binomial (LRT),"",<0.001,No
+Skin,13.03.00,Topical local anaesthetics and antipruritics,Primary inferential,1.073,1.043,1.125,Apr,Nov,Unimodal,0.371,0.879,0.148,Negbin,Negative binomial (LRT),"",0.0257,No
+Endocrine System,06.04.01,Female sex hormones and their modulators,Primary inferential,1.068,1.049,1.100,Jul,Feb,Unimodal,0.334,0.959,0.449,Negbin,Negative binomial (LRT),"",<0.001,No
+Eye,11.03.03,Antivirals,Primary inferential,1.066,1.046,1.095,Jan,Oct,Bimodal,0.242,0.842,0.261,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Infections,05.01.11,"Metronidazole, tinidazole and ornidazole",Primary inferential,1.065,1.038,1.105,Sep,Jun,Bimodal,0.629,0.615,0.490,Poisson,Poisson + Newey–West HAC (Wald),No,0.00173,No
+Infections,05.02.01,Triazole antifungals,Primary inferential,1.063,1.039,1.112,Aug,Jan,Unimodal,0.295,0.558,0.310,Negbin,Negative binomial (LRT),"",0.0458,No
+Infections,05.01.08,Sulfonamides and trimethoprim,Primary inferential,1.062,1.045,1.098,Nov,Jun,Unimodal,0.575,0.343,0.442,Negbin,Negative binomial (LRT),"",<0.001,No
+Gastro-Intestinal System,01.07.02,Compound haemorrhoidal preparations with corticosteroid,Primary inferential,1.061,1.049,1.076,Mar,Jul,Bimodal,0.433,0.000,0.396,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Skin,13.02.01,Emollients,Primary inferential,1.061,1.048,1.079,Apr,Oct,Unimodal (non-sinusoidal),0.429,0.316,0.371,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Respiratory System,03.02.00,Corticosteroids (respiratory),Primary inferential,1.061,1.048,1.073,Dec,Aug,Bimodal,0.469,0.527,0.309,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Skin,13.10.01,Antibacterial preparations,Primary inferential,1.059,1.037,1.105,Apr,Dec,Bimodal,0.294,0.354,0.343,Poisson,Poisson + Newey–West HAC (Wald),No,0.0117,No
+Gastro-Intestinal System,01.01.02,Compound alginates and proprietary indigestion preparations,Primary inferential,1.058,1.044,1.080,Dec,Jul,Unimodal (non-sinusoidal),0.171,0.112,0.210,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Gastro-Intestinal System,01.07.01,Soothing haemorrhoidal preparations,Primary inferential,1.057,1.044,1.071,Feb,Jun,Bimodal,0.521,0.384,0.392,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Infections,05.01.07,Some other antibacterials,Primary inferential,1.056,1.037,1.085,Sep,Apr,Unimodal,0.161,0.940,0.259,Negbin,Negative binomial (LRT),"",0.00188,No
+Skin,13.11.03,Cationic surfactants and soaps,Primary inferential,1.054,1.033,1.091,Apr,Jan,Bimodal,0.507,0.787,0.419,Poisson,Poisson + Newey–West HAC (Wald),No,0.00112,No
+Skin,13.06.01,Topical preparations for acne,Primary inferential,1.052,1.032,1.104,Mar,Jun,Bimodal,0.694,0.467,0.523,Poisson,Poisson + Newey–West HAC (Wald),No,0.0462,No
+Musculoskeletal and Joint Diseases,10.03.02,"Rubefacients, topical NSAIDs, capsaicin and poultices",Primary inferential,1.047,1.043,1.059,Sep,Jan,Bimodal,0.430,0.366,0.242,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Central Nervous System,04.04.00,CNS stimulants and drugs used for ADHD,Primary inferential,1.046,1.026,1.080,Apr,Aug,Bimodal,0.619,0.986,0.508,Poisson,Poisson + Newey–West HAC (Wald),No,0.0252,No
+Cardiovascular System,02.11.00,Antifibrinolytic drugs and haemostatics,Primary inferential,1.046,1.034,1.061,Aug,Dec,Bimodal,0.483,0.812,0.566,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+"Obstetrics, Gynaecology and Urinary-Tract Disorders",07.03.01,Combined hormonal contraceptives and systems,Primary inferential,1.042,1.029,1.062,Jul,Nov,Bimodal,0.484,0.969,0.430,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Skin,13.01.01,Management of skin conditions,Primary inferential,1.036,1.026,1.060,May,Oct,Unimodal,0.263,0.950,0.230,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Cardiovascular System,02.02.02,Loop diuretics,Primary inferential,1.034,1.026,1.050,Jul,Feb,Unimodal (non-sinusoidal),0.000,0.000,0.014,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Central Nervous System,04.01.01,Hypnotics,Primary inferential,1.034,1.027,1.051,Feb,Jun,Unimodal (non-sinusoidal),0.311,0.298,0.068,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Cardiovascular System,02.07.02,Vasoconstrictor sympathomimetics,Primary inferential,1.032,1.019,1.053,Nov,Apr,Unimodal (non-sinusoidal),0.160,0.988,-0.100,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Skin,13.09.00,Shampoo and other preparations for scalp and hair conditions,Primary inferential,1.027,1.016,1.048,Sep,Jan,Bimodal,0.359,0.312,0.235,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.00495,No
+Nutrition and Blood,09.05.02,Phosphorus,Primary inferential,1.027,1.017,1.051,Sep,Mar,Unimodal,0.319,0.784,0.066,Poisson,Poisson + Newey–West HAC (Wald),No,0.0165,No
+"Obstetrics, Gynaecology and Urinary-Tract Disorders",07.03.02,Progestogen-only contraceptives,Primary inferential,1.026,1.015,1.045,Feb,Oct,Bimodal,0.382,0.856,0.421,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Cardiovascular System,02.02.04,Potassium sparing diuretics and compounds,Primary inferential,1.026,1.014,1.044,Oct,Feb,Unimodal (non-sinusoidal),0.165,0.982,-0.113,Poisson,Poisson + Newey–West HAC (Wald),No,0.0115,No
+Respiratory System,03.03.02,Leukotriene receptor antagonists,Primary inferential,1.025,1.020,1.035,Dec,Sep,Bimodal,0.000,0.775,0.008,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Infections,05.04.01,Antimalarials,Primary inferential,1.025,1.019,1.043,Sep,Mar,Unimodal (non-sinusoidal),0.172,0.904,-0.083,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Respiratory System,03.07.00,Mucolytics,Primary inferential,1.025,1.020,1.035,Dec,Aug,Bimodal,0.000,0.928,-0.152,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Musculoskeletal and Joint Diseases,10.01.01,Non-steroidal anti-inflammatory drugs,Primary inferential,1.025,1.021,1.043,Apr,Dec,Bimodal,0.074,0.131,0.107,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Nutrition and Blood,09.01.01,Iron-deficiency anaemias,Primary inferential,1.024,1.019,1.042,Jul,Feb,Unimodal (non-sinusoidal),0.000,0.701,0.070,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Gastro-Intestinal System,01.04.02,Antimotility drugs,Primary inferential,1.024,1.016,1.041,Jul,Mar,Unimodal (non-sinusoidal),0.171,0.060,-0.094,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Gastro-Intestinal System,01.03.01,H2-receptor antagonists,Primary inferential,1.023,1.016,1.037,Nov,Apr,Unimodal (non-sinusoidal),0.000,0.994,-0.082,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Nutrition and Blood,09.06.04,Vitamin D,Primary inferential,1.023,1.018,1.039,Apr,Aug,Unimodal (non-sinusoidal),0.000,0.552,-0.081,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Central Nervous System,04.11.00,Dementia,Primary inferential,1.023,1.014,1.041,Nov,Mar,Bimodal,0.000,0.814,-0.114,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Endocrine System,06.03.01,Replacement therapy,Primary inferential,1.023,1.016,1.040,Dec,Apr,Unimodal (non-sinusoidal),0.000,0.855,-0.131,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Respiratory System,03.01.02,Antimuscarinic bronchodilators,Primary inferential,1.022,1.015,1.036,Dec,Aug,Bimodal,0.184,0.983,-0.105,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Endocrine System,06.01.01,Insulin,Primary inferential,1.022,1.015,1.042,Dec,Sep,Bimodal,0.197,0.538,-0.056,Poisson,Poisson + Newey–West HAC (Wald),No,0.0234,No
+Central Nervous System,04.06.00,Drugs used in nausea and vertigo,Primary inferential,1.021,1.016,1.035,Oct,May,Unimodal (non-sinusoidal),0.134,0.045,-0.050,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Musculoskeletal and Joint Diseases,10.01.04,Gout and cytotoxic induced hyperuicaemia,Primary inferential,1.020,1.013,1.040,Jul,Mar,Unimodal (non-sinusoidal),0.000,0.587,-0.138,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Central Nervous System,04.10.03,Opioid dependence,Primary inferential,1.020,1.013,1.036,May,Sep,Bimodal,0.122,0.686,-0.039,Poisson,Poisson + Newey–West HAC (Wald),No,0.00173,No
+Central Nervous System,04.09.01,Dopaminergic drugs used in parkinsonism,Primary inferential,1.019,1.011,1.034,Nov,Mar,Bimodal,0.000,0.000,-0.169,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Cardiovascular System,02.06.02,Calcium-channel blockers,Primary inferential,1.019,1.015,1.030,Apr,Aug,Unimodal (non-sinusoidal),0.000,0.746,-0.131,Poisson,Poisson + Newey–West HAC (Wald),No,<0.001,No
+Central Nervous System,04.02.02,Antipsychotic depot injections,Primary inferential,1.018,1.013,1.037,Jan,Aug,Unimodal,0.170,0.662,0.103,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Central Nervous System,04.10.01,Alcohol dependence,Primary inferential,1.017,1.011,1.038,Dec,Mar,Bimodal,0.000,0.712,-0.103,Poisson,Poisson + Newey–West HAC (Wald),No,0.0212,No
+Endocrine System,06.01.06,Diabetic diagnostic and monitoring agents,Primary inferential,1.017,1.014,1.032,Jul,Dec,Unimodal (non-sinusoidal),0.115,0.876,-0.068,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Nutrition and Blood,09.06.07,Multivitamin preparations,Primary inferential,1.016,1.011,1.030,Dec,Jul,Unimodal (non-sinusoidal),0.000,0.702,-0.094,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.00214,No
+Central Nervous System,04.07.01,Non-opioid analgesics and compound preparations,Primary inferential,1.016,1.012,1.030,Nov,Aug,Bimodal,0.000,0.210,-0.170,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Cardiovascular System,02.02.03,Potassium-sparing diuretics and aldosterone antagonists,Primary inferential,1.016,1.007,1.034,Nov,Mar,Bimodal,0.000,0.948,-0.193,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.022,No
+Endocrine System,06.04.02,Male sex hormones and antagonists,Primary inferential,1.016,1.013,1.030,Nov,Jul,Bimodal,0.000,0.644,-0.170,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+"Obstetrics, Gynaecology and Urinary-Tract Disorders",07.04.01,Drugs for urinary retention,Primary inferential,1.015,1.011,1.028,Nov,Aug,Bimodal,0.000,0.708,-0.182,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Central Nervous System,04.03.01,Tricyclic and related antidepressant drugs,Primary inferential,1.015,1.012,1.033,Nov,Jul,Bimodal,0.000,0.153,-0.150,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Cardiovascular System,02.05.04,Alpha-adrenoceptor blocking drugs,Primary inferential,1.015,1.010,1.025,Apr,Aug,Bimodal,0.000,0.585,-0.160,Poisson,Poisson + Newey–West HAC (Wald),No,0.00112,No
+Central Nervous System,04.03.04,Other antidepressant drugs,Primary inferential,1.013,1.011,1.028,Dec,Jul,Unimodal (non-sinusoidal),0.000,0.818,-0.169,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Cardiovascular System,02.08.02,Oral anticoagulants,Primary inferential,1.013,1.007,1.030,Nov,Mar,Bimodal,0.000,0.562,-0.181,Poisson,Poisson + Newey–West HAC (Wald),No,0.00532,No
+Cardiovascular System,02.02.01,Thiazides and related diuretics,Primary inferential,1.012,1.008,1.025,May,Sep,Bimodal,0.000,0.717,-0.165,Poisson,Poisson + Newey–West HAC (Wald),No,0.0019,No
+Cardiovascular System,02.01.01,Cardiac glycosides,Primary inferential,1.012,1.008,1.030,Nov,Mar,Bimodal,0.000,0.244,-0.174,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Central Nervous System,04.02.03,Drugs used for mania and hypomania,Primary inferential,1.012,1.008,1.031,Dec,Aug,Bimodal,0.116,0.731,-0.186,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.0342,No
+Gastro-Intestinal System,01.06.02,Stimulant laxatives,Primary inferential,1.012,1.007,1.030,Nov,Mar,Unimodal (non-sinusoidal),0.000,0.755,-0.171,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.043,No
+Cardiovascular System,02.06.03,Other antianginal drugs,Primary inferential,1.011,1.007,1.032,Nov,Mar,Bimodal,0.000,0.602,-0.185,Poisson,Poisson + Newey–West HAC (Wald),No,0.0321,No
+Central Nervous System,04.02.01,Antipsychotic drugs,Primary inferential,1.011,1.008,1.028,Dec,Apr,Bimodal,0.000,0.004,-0.175,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.00314,No
+Respiratory System,03.01.04,Compound bronchodilator preparations,Primary inferential,1.010,1.007,1.025,Dec,Aug,Bimodal,0.000,0.864,-0.226,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.00182,No
+Cardiovascular System,02.09.00,Antiplatelet drugs,Primary inferential,1.010,1.007,1.025,Nov,Feb,Bimodal,0.000,0.000,-0.205,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Malignant Disease and Immunosuppression,08.03.04,Hormone antagonists,Primary inferential,1.009,1.007,1.027,Dec,Aug,Bimodal,0.000,0.000,-0.190,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.00341,No
+Central Nervous System,04.03.03,Selective serotonin re-uptake inhibitors,Primary inferential,1.009,1.007,1.025,Dec,Aug,Unimodal (non-sinusoidal),0.000,0.117,-0.147,Poisson,Poisson + Newey–West HAC (Wald),Yes,<0.001,No
+Central Nervous System,04.08.01,Control of epilepsy,Primary inferential,1.009,1.006,1.028,Nov,Mar,Bimodal,0.000,0.189,-0.192,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.0462,No
+Cardiovascular System,02.04.00,Beta-adrenoceptor blocking drugs,Primary inferential,1.009,1.006,1.024,Nov,Aug,Bimodal,0.000,0.285,-0.196,Poisson,Poisson + Newey–West HAC (Wald),No,0.00811,No
+Nutrition and Blood,09.06.02,Vitamin B group,Primary inferential,1.009,1.006,1.029,Nov,Apr,Unimodal (non-sinusoidal),0.000,0.170,-0.186,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.0224,No
+Cardiovascular System,02.05.05,Renin-angiotensin system drugs,Primary inferential,1.009,1.006,1.022,May,Aug,Bimodal,0.000,0.532,-0.195,Poisson,Poisson + Newey–West HAC (Wald),No,0.0167,No
+Cardiovascular System,02.12.00,Lipid-regulating drugs,Primary inferential,1.007,1.005,1.022,Nov,Aug,Bimodal,0.000,0.893,-0.226,Poisson,Poisson + Newey–West HAC (Wald),Yes,0.0304,No

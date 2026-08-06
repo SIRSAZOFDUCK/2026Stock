@@ -1,0 +1,60 @@
+# This repository is allowlisted: every file is ignored unless explicitly
+# required for the independent analysis or source verification.
+*
+!*/
+
+# Repository documentation and execution files
+!.gitignore
+!.Rprofile
+!README.md
+!DESCRIPTION
+!analysis_main.R
+!verify_inputs.R
+!renv.lock
+
+# Minimal renv bootstrap (installed libraries remain excluded)
+!renv/.gitignore
+!renv/activate.R
+!renv/settings.json
+
+# Small, version-specific public reference inputs
+!bnf_code_current_202505_version_88.csv
+!reproducibility/input_manifest.csv
+!reproducibility/source_snapshots/bank-holidays_2026-08-05.json
+
+# Sealed validation reference required by sensitivity/diagnostic stages
+!Outputs/canonical/qc/stage4/stage4_snapshot_manifest.csv
+!Outputs/canonical/qc/stage4/stage4_snapshot/**
+
+# Explicit defence against accidental primary-data or generated-output commits
+data/**
+*.ZIP
+*.zip
+gp-reg-pat-prac-all_*.csv
+Outputs/**
+
+# Re-allow the one committed validation reference after excluding Outputs
+!Outputs/
+!Outputs/canonical/
+!Outputs/canonical/qc/
+!Outputs/canonical/qc/stage4/
+!Outputs/canonical/qc/stage4/stage4_snapshot_manifest.csv
+!Outputs/canonical/qc/stage4/stage4_snapshot/
+!Outputs/canonical/qc/stage4/stage4_snapshot/**
+
+# Manuscripts, reports and extra Markdown are never part of this release
+*.md
+!README.md
+
+# Local/runtime artefacts
+.DS_Store
+.RData
+.Rhistory
+.Rapp.history
+.Rproj.user/
+renv/library/
+renv/staging/
+node_modules/
+__pycache__/
+*.tmp
+~$*

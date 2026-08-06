@@ -1,0 +1,5 @@
+Stage,Classes,Drugs,Class inference scope,Drug inference scope
+Eligible series,220,974,Primary; all eligible classes,Secondary exploratory; all eligible drugs
+Statistically significant within stated complete family (BH FDR 5%),125,391,Primary; all eligible classes,Secondary exploratory; all eligible drugs
+Significant but trivial amplitude (ratio < 1.05),56,172,Primary; all eligible classes,Secondary exploratory; all eligible drugs
+Meaningful seasonality (amplitude CI ≥ threshold and seasonal strength ≥ threshold),30,88,Primary; all eligible classes,Secondary exploratory; all eligible drugs
